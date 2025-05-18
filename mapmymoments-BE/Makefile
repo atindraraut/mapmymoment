@@ -1,7 +1,7 @@
 # Makefile for Students API
 
 # Variables
-APP_NAME := students-api
+APP_NAME := routes-api
 CONFIG_FILE := config/local.yaml
 
 # Default target
