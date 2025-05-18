@@ -13,7 +13,6 @@ import (
 	"github.com/atindraraut/crudgo/internal/http/handlers/student"
 	"github.com/atindraraut/crudgo/internal/http/handlers/public"
 	"github.com/atindraraut/crudgo/storage/sqlite"
-	"github.com/atindraraut/crudgo/internal/utils/response"
 )
 
 func timeTracker(next http.Handler) http.Handler {
