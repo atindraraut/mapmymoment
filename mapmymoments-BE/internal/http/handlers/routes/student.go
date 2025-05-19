@@ -1,4 +1,4 @@
-package student
+package routes
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+
 	"github.com/atindraraut/crudgo/internal/types"
 	"github.com/atindraraut/crudgo/internal/utils/response"
 	"github.com/atindraraut/crudgo/storage"
@@ -16,7 +17,7 @@ func New(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		var student types.Student
-		err:=json.NewDecoder(r.Body).Decode(&student)
+		err := json.NewDecoder(r.Body).Decode(&student)
 		if errors.Is(err, io.EOF) {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("request body is empty")))
 			return
@@ -31,14 +32,14 @@ func New(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.ValidationError(validatorErrors))
 			return
 		}
-		id,err:=storage.CreateStudent(student.Name, student.Age, student.Email)
+		id, err := storage.CreateStudent(student.Name, student.Age, student.Email)
 		if err != nil {
 			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
 			return
 		}
 		responseData := map[string]interface{}{
 			"Message": "Student created successfully",
-			"id": id,
+			"id":      id,
 		}
 		response.WriteJSON(w, http.StatusCreated, responseData)
 	}
@@ -52,7 +53,7 @@ func GetById(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 		idInt, _ := strconv.ParseInt(id, 10, 64)
-		student , err := storage.GetStudentById(idInt)
+		student, err := storage.GetStudentById(idInt)
 		if err != nil {
 			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
 			return
@@ -81,7 +82,7 @@ func Update(storage storage.Storage) http.HandlerFunc {
 		}
 		idInt, _ := strconv.ParseInt(id, 10, 64)
 		var student types.Student
-		err:=json.NewDecoder(r.Body).Decode(&student)
+		err := json.NewDecoder(r.Body).Decode(&student)
 		if errors.Is(err, io.EOF) {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("request body is empty")))
 			return
@@ -95,14 +96,14 @@ func Update(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.ValidationError(validatorErrors))
 			return
 		}
-		updatedId ,err := storage.UpdateStudent(idInt, student.Name, student.Age, student.Email)
+		updatedId, err := storage.UpdateStudent(idInt, student.Name, student.Age, student.Email)
 		if err != nil {
 			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
 			return
 		}
 		responseData := map[string]interface{}{
 			"Message": "Student updated successfully",
-			"id": updatedId,
+			"id":      updatedId,
 		}
 		response.WriteJSON(w, http.StatusOK, responseData)
 	}
@@ -123,7 +124,7 @@ func Delete(storage storage.Storage) http.HandlerFunc {
 		}
 		responseData := map[string]interface{}{
 			"Message": "Student deleted successfully",
-			"id": updatedId,
+			"id":      updatedId,
 		}
 		response.WriteJSON(w, http.StatusOK, responseData)
 	}
