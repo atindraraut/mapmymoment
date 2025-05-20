@@ -15,6 +15,7 @@ type Config struct {
 	Env         string `yaml:"env" env:"ENV" env-required:"true"` //these are called struct tags in golang
 	Storagepath string `yaml:"storage_path" env-required:"true"`
 	HTTPServer  `yaml:"http_address" env-required:"true"`
+	SECRET_KEY string `yaml:"secret_key" env-required:"true"`
 }
 
 func MustLoadConfig() *Config {
