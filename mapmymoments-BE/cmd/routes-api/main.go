@@ -13,7 +13,7 @@ import (
 	"github.com/atindraraut/crudgo/internal/config"
 	"github.com/atindraraut/crudgo/internal/http/handlers/public"
 	"github.com/atindraraut/crudgo/internal/http/handlers/routes"
-	"github.com/atindraraut/crudgo/internal/http/handlers/auth"
+	"github.com/atindraraut/crudgo/internal/http/handlers/user"
 	"github.com/atindraraut/crudgo/internal/utils/middleware"
 	"github.com/atindraraut/crudgo/storage/sqlite"
 )
@@ -34,7 +34,7 @@ func main() {
 
 	public.RegisterRoutes(router, storage)
 	routes.RegisterRoutes(router, storage)
-	auth.RegisterRoutes(router, storage)
+	user.RegisterRoutes(router, storage)
 	//setup server
 	server := &http.Server{
 		Addr:    cfg.HTTPServer.ADDR,
