@@ -12,10 +12,12 @@ type HTTPServer struct {
 	ADDR string `yaml:"address" env:"ADDR" env-default:"localhost:8080"`
 }
 type Config struct {
-	Env         string `yaml:"env" env:"ENV" env-required:"true"` //these are called struct tags in golang
-	Storagepath string `yaml:"storage_path" env-required:"true"`
-	HTTPServer  `yaml:"http_address" env-required:"true"`
-	SECRET_KEY string `yaml:"secret_key" env-required:"true"`
+	Env           string `yaml:"env" env:"ENV" env-required:"true"` //these are called struct tags in golang
+	Storagepath   string `yaml:"storage_path" env-required:"true"`
+	HTTPServer    `yaml:"http_address" env-required:"true"`
+	SECRET_KEY    string `yaml:"secret_key" env-required:"true"`
+	MongoURI      string
+	MongoDatabase string
 }
 
 func MustLoadConfig() *Config {

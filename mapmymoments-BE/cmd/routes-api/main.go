@@ -15,14 +15,14 @@ import (
 	"github.com/atindraraut/crudgo/internal/http/handlers/routes"
 	"github.com/atindraraut/crudgo/internal/http/handlers/user"
 	"github.com/atindraraut/crudgo/internal/utils/middleware"
-	"github.com/atindraraut/crudgo/storage/sqlite"
+	"github.com/atindraraut/crudgo/storage/mongodb"
 )
 
 func main() {
 	//load config
 	cfg := config.MustLoadConfig()
 	//database setup
-	storage, err := sqlite.New(cfg)
+	storage, err := mongodb.New(cfg)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %s", err.Error())
 	}
