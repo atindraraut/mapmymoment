@@ -28,9 +28,11 @@ const Hero = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 animate-fade-up" style={{ animationDelay: "0.7s" }}>
+            <a href="/login">
             <Button className="bg-secondary hover:bg-secondary/90 text-foreground px-8 py-6 text-lg">
               Get Started
             </Button>
+            </a>
             {/* <Button variant="outline" className="border-white text-white hover:bg-white/10 px-8 py-6 text-lg">
               Explore Journeys
             </Button> */}

@@ -21,7 +21,7 @@ const Navbar = () => {
           <a href="/login">
             <Button variant="outline" className="border-primary text-primary hover:bg-primary/10">Log In</Button>
           </a>
-          <Button className="bg-primary hover:bg-primary/90 text-white">Get Started</Button>
+          {/* <Button className="bg-primary hover:bg-primary/90 text-white">Get Started</Button> */}
         </nav>
         
         <button 
@@ -43,7 +43,7 @@ const Navbar = () => {
             <a href="/login">
               <Button variant="outline" className="border-primary text-primary hover:bg-primary/10 w-full">Log In</Button>
             </a>
-            <Button className="bg-primary hover:bg-primary/90 text-white w-full">Get Started</Button>
+            {/* <Button className="bg-primary hover:bg-primary/90 text-white w-full">Get Started</Button> */}
           </div>
         </div>
       )}
