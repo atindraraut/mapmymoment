@@ -1,4 +1,31 @@
 package types
+
+import (
+	"time"
+	jwt "github.com/dgrijalva/jwt-go"
+)
+type Student struct {
+	Id int64
+	Name string `validate:"required"`
+	Age int `validate:"required"`
+	Email string `validate:"required"`
+}
+
+type SignedDetails struct {
+	Email      string
+	First_name string
+	Last_name  string
+	Uid        string
+	jwt.StandardClaims
+}
+type OTPRecord struct {
+	Email     string        `bson:"email" json:"email"`
+	OTP       string        `bson:"otp" json:"otp"`
+	ExpiresAt time.Time     `bson:"expires_at" json:"expires_at"`
+	SignupReq SignupRequest `bson:"signup_req" json:"signup_req"`
+	Password  string        `bson:"password" json:"password"`
+}
+
 type UserData struct {
 	Email     string
 	Password  string // In production, store hashed password!

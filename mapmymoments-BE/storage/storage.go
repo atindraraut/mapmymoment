@@ -9,5 +9,8 @@ type Storage interface {
 	DeleteStudent(id int64) (int64, error)
 	GetUserByEmail(email string) (types.UserData, error)
 	CreateUser(user types.UserData) (int64, error)
+	GetOTPRecordByEmail(email string) (types.OTPRecord, error)
+	SaveOTPRecord(record types.OTPRecord) (error)
+	DeleteOTPRecordByEmail(email string) ( error)
 }
 

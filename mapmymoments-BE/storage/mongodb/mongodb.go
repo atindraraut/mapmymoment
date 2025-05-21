@@ -28,7 +28,14 @@ func New(cfg *config.Config) (*MongoDB, error) {
 	}
 	db := client.Database(cfg.MongoDatabase)
 	coll := db.Collection("students")
-	return &MongoDB{client: client, database: db, collection: coll}, nil
+	mdb := &MongoDB{client: client, database: db, collection: coll}
+
+	// Ensure OTP TTL index exists
+	if err := mdb.ensureOTPTTLIndex(); err != nil {
+		return nil, fmt.Errorf("failed to ensure OTP TTL index: %w", err)
+	}
+
+	return mdb, nil
 }
 
 func (m *MongoDB) CreateStudent(name string, age int, email string) (int64, error) {
@@ -77,4 +84,3 @@ func (m *MongoDB) DeleteStudent(id int64) (int64, error) {
 	// Placeholder: implement using MongoDB's delete logic
 	return 0, fmt.Errorf("DeleteStudent not implemented for MongoDB with int64 IDs")
 }
-
