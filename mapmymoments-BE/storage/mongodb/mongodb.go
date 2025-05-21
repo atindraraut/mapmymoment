@@ -77,3 +77,4 @@ func (m *MongoDB) DeleteStudent(id int64) (int64, error) {
 	// Placeholder: implement using MongoDB's delete logic
 	return 0, fmt.Errorf("DeleteStudent not implemented for MongoDB with int64 IDs")
 }
+

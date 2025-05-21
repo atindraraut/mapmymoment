@@ -1,9 +1,13 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
+
+	auth "github.com/atindraraut/crudgo/internal/utils/helpers"
 )
 
 type statusRecorder struct {
@@ -25,4 +29,45 @@ func TimeTracker(next http.Handler) http.Handler {
 		duration := time.Since(start)
 		slog.Info("Request duration", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.Int("status", rec.status), slog.Duration("duration", duration))
 	})
+}
+
+// UserContextKey is the key for user data in request context
+var UserContextKey = &struct{}{}
+
+type AuthUser struct {
+	Email     string
+	FirstName string
+	LastName  string
+	Uid       string
+}
+
+// AuthMiddleware validates JWT and populates user data in request context
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := r.Header.Get("Authorization")
+		if header == "" || !strings.HasPrefix(header, "Bearer ") {
+			http.Error(w, "Missing or invalid Authorization header", http.StatusUnauthorized)
+			return
+		}
+		tokenStr := strings.TrimPrefix(header, "Bearer ")
+		details, msg := auth.VerifyToken(tokenStr)
+		if msg != "nil" {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+		user := &AuthUser{
+			Email:     details.Email,
+			FirstName: details.First_name,
+			LastName:  details.Last_name,
+			Uid:       details.Uid,
+		}
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetAuthUser extracts user data from request context
+func GetAuthUser(r *http.Request) *AuthUser {
+	user, _ := r.Context().Value(UserContextKey).(*AuthUser)
+	return user
 }
