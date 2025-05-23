@@ -3,14 +3,20 @@ package routes
 import (
 	"net/http"
 
+	"github.com/atindraraut/crudgo/internal/utils/middleware"
 	"github.com/atindraraut/crudgo/storage"
 )
 
 func RegisterRoutes(router *http.ServeMux, storage storage.Storage) {
-	// Registering routes for student handlers
-	router.Handle("POST /api/students", http.HandlerFunc(New(storage)))
-	router.Handle("GET /api/students/{id}", http.HandlerFunc(GetById(storage)))
-	router.Handle("GET /api/students", http.HandlerFunc(Getlist(storage)))
-	router.Handle("PUT /api/students/{id}", http.HandlerFunc(Update(storage)))
-	router.Handle("DELETE /api/students/{id}", http.HandlerFunc(Delete(storage)))
+	// Public routes
+	router.Handle("GET /api/routes", GetAllRoutes(storage))
+	router.Handle("GET /api/routes/{id}", GetRouteById(storage))
+
+	// Authenticated user routes (require AuthMiddleware)
+	router.Handle("POST /api/routes", middleware.WithMiddleware(NewRoute(storage), middleware.AuthMiddleware(storage)))
+	router.Handle("PUT /api/routes/{id}", middleware.WithMiddleware(UpdateRoute(storage), middleware.AuthMiddleware(storage)))
+	router.Handle("DELETE /api/routes/{id}", middleware.WithMiddleware(DeleteRoute(storage), middleware.AuthMiddleware(storage)))
+
+	// User's own routes (private)
+	router.Handle("GET /api/my-routes", middleware.WithMiddleware(GetUserRoutes(storage), middleware.AuthMiddleware(storage)))
 }
