@@ -18,9 +18,9 @@ const SignUp = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If already logged in, redirect to dashboard
+    // If already logged in, redirect to app
     if (localStorage.getItem('access_token')) {
-      navigate('/dashboard');
+      navigate('/app');
     }
   }, [navigate]);
 

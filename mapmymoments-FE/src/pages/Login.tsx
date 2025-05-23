@@ -11,9 +11,9 @@ const Login = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If already logged in, redirect to dashboard
+    // If already logged in, redirect to app
     if (localStorage.getItem('access_token')) {
-      navigate('/dashboard');
+      navigate('/app');
     }
   }, [navigate]);
 
@@ -41,7 +41,7 @@ const Login = () => {
         localStorage.setItem('email', data.email);
         localStorage.setItem('first_name', data.first_name);
         localStorage.setItem('last_name', data.last_name);
-        navigate('/dashboard');
+        navigate('/app');
       } else {
         setError(data.message || 'Login failed');
       }
