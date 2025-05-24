@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useMapsLibrary } from '@vis.gl/react-google-maps'; // Added import
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -26,11 +27,97 @@ const PlanModal = ({ isOpen, onPreviewRoute }: PlanModalProps) => {
   const [draggedStop, setDraggedStop] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const dragItemRef = useRef<HTMLDivElement | null>(null);
-  const lastInputRef = useRef<HTMLInputElement>(null);
+  const lastInputRef = useRef<HTMLInputElement | null>(null);
   const [lastAddedStopId, setLastAddedStopId] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+  // Refs for Autocomplete inputs
+  const originInputRef = useRef<HTMLInputElement>(null);
+  const destinationInputRef = useRef<HTMLInputElement>(null);
+  const stopInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const placesLib = useMapsLibrary('places');
+
+  const autocompleteOptions = {
+    fields: ["formatted_address", "geometry", "name", "place_id"],
+    types: ["geocode", "establishment"],
+  };
+
+  // Autocomplete for Origin
+  useEffect(() => {
+    if (!placesLib || !originInputRef.current) {
+      return;
+    }
+    const autocomplete = new placesLib.Autocomplete(originInputRef.current, autocompleteOptions);
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      setOrigin(place.formatted_address || place.name || '');
+      // If you need to store lat/lng for origin, you can do it here:
+      // e.g., setOriginCoords({ lat: place.geometry?.location?.lat(), lng: place.geometry?.location?.lng() });
+    });
+    return () => {
+      listener.remove();
+      // It's good practice to clear listeners from the Autocomplete instance itself if the API provides a way,
+      // or clear from the input element if that's where they are attached by the library.
+      // google.maps.event.clearInstanceListeners(originInputRef.current); // Might be too broad
+    };
+  }, [placesLib]);
+
+  // Autocomplete for Destination
+  useEffect(() => {
+    if (!placesLib || !destinationInputRef.current) {
+      return;
+    }
+    const autocomplete = new placesLib.Autocomplete(destinationInputRef.current, autocompleteOptions);
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      setDestination(place.formatted_address || place.name || '');
+      // Similar for destination coordinates if needed
+    });
+    return () => {
+      listener.remove();
+      // google.maps.event.clearInstanceListeners(destinationInputRef.current);
+    };
+  }, [placesLib]);
+
+  // Autocomplete for Stops
+  useEffect(() => {
+    if (!placesLib) {
+      return;
+    }
+
+    const listeners: google.maps.MapsEventListener[] = [];
+
+    stops.forEach((stop, index) => {
+      const inputElement = stopInputRefs.current[index];
+      if (inputElement) {
+        const autocomplete = new placesLib.Autocomplete(inputElement, autocompleteOptions);
+        const listener = autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          const newStops = [...stops];
+          const targetStop = newStops[index];
+          if (targetStop) {
+            targetStop.name = place.formatted_address || place.name || '';
+            if (place.geometry && place.geometry.location) {
+              targetStop.lat = place.geometry.location.lat();
+              targetStop.lng = place.geometry.location.lng();
+            }
+            setStops(newStops);
+          }
+        });
+        listeners.push(listener);
+      }
+    });
+
+    return () => {
+      listeners.forEach(listener => listener.remove());
+      // stopInputRefs.current.forEach(input => {
+      //   if (input) google.maps.event.clearInstanceListeners(input);
+      // });
+    };
+  }, [placesLib, stops, stops.length]); // Rerun if placesLib is loaded or stops array changes
 
   const handleAddStop = () => {
     const newStop: Stop = {
@@ -48,7 +135,7 @@ const PlanModal = ({ isOpen, onPreviewRoute }: PlanModalProps) => {
     if (lastAddedStopId && lastInputRef.current) {
       lastInputRef.current.focus();
     }
-  }, [stops.length]);
+  }, [stops, lastAddedStopId]); // Added stops and lastAddedStopId to dependency array for correctness
 
   const handleMoveStop = (dragIndex: number, hoverIndex: number) => {
     const newStops = [...stops];
@@ -282,7 +369,12 @@ const PlanModal = ({ isOpen, onPreviewRoute }: PlanModalProps) => {
           {/* Stop Input */}
           <input
             type="text"
-            ref={lastAddedStopId === stop.id ? lastInputRef : null}
+            ref={el => {
+              stopInputRefs.current[index] = el; // For autocomplete
+              if (lastAddedStopId === stop.id) { // For focusing
+                lastInputRef.current = el;
+              }
+            }}
             value={stop.name}
             onChange={(e) => {
               const newStops = [...stops];
@@ -521,6 +613,7 @@ const PlanModal = ({ isOpen, onPreviewRoute }: PlanModalProps) => {
             </div>
             <input
               type="text"
+              ref={originInputRef} // Attach ref for Autocomplete
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               placeholder="Search or click map for start point"
@@ -554,6 +647,7 @@ const PlanModal = ({ isOpen, onPreviewRoute }: PlanModalProps) => {
             </div>
             <input
               type="text"
+              ref={destinationInputRef} // Attach ref for Autocomplete
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder="Search or click map for end point"
