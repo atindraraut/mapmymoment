@@ -1,9 +1,9 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
-import { useMapsLibrary } from '@vis.gl/react-google-maps';
 import { cn } from "@/lib/utils"; // Assuming cn is here
 import { Button } from "@/components/ui/button"; // Assuming Button is here
 import { useToast } from "@/hooks/use-toast"; // Assuming useToast is here
 import confetti from 'confetti-js'; // Added confetti
+import { useState, useEffect, useRef, ReactNode } from 'react'; // Explicit React imports
+import { useMapsLibrary } from '@vis.gl/react-google-maps'; // Assuming this is the correct import path
 
 // Added Stop interface
 interface Stop {
@@ -17,12 +17,12 @@ type Props = {
   isOpen: boolean;
   children?: ReactNode;
   onPlaceSelect?: (place: google.maps.places.PlaceResult | null, type: 'origin' | 'destination' | 'stop', stopId?: string) => void;
-  // Added for consistency with PlanModal if external preview handling is needed
-  onPreviewRoute?: (points: { origin: string; destination: string; stops: Stop[] }) => void; 
+  onPreviewRoute?: (points: { origin: string; destination: string; stops: Stop[] }) => void;
+  onClose: () => void; // Added onClose prop to manage modal visibility from parent
 }
 
-export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Props) {
-  const { toast } = useToast(); // Initialize toast
+export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, onClose }: Props) {
+  const { toast } = useToast();
   const [routeName, setRouteName] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -31,16 +31,12 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
   const originInputRef = useRef<HTMLInputElement>(null);
   const destinationInputRef = useRef<HTMLInputElement>(null);
   const stopInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  // const lastInputRef = useRef<HTMLInputElement | null>(null); // Kept from PlanModal, might be useful
   const [lastAddedStopId, setLastAddedStopId] = useState<string | null>(null);
 
-  // State from PlanModal.tsx
   const [isSaved, setIsSaved] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  // showMobilePreview might not be directly applicable if NewPlanModal has a different responsive strategy,
-  // but let's include it for now if we adapt PlanModal's responsive classes directly.
-  const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [isFormExpanded, setIsFormExpanded] = useState(false); // New state for UI expansion
 
 
   const placesLib = useMapsLibrary('places');
@@ -50,7 +46,7 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     types: ["geocode", "establishment"],
   };
 
-  // Autocomplete for Origin (existing, ensure it's preserved)
+  // Autocomplete for Origin
   useEffect(() => {
     if (!placesLib || !originInputRef.current) {
       return;
@@ -58,19 +54,23 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     const autocomplete = new placesLib.Autocomplete(originInputRef.current, autocompleteOptions);
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-      setOrigin(place.formatted_address || place.name || '');
+      const newOrigin = place.formatted_address || place.name || '';
+      setOrigin(newOrigin);
       if (onPlaceSelect && place) {
         onPlaceSelect(place, 'origin');
+      }
+      if (newOrigin && !isFormExpanded) { // Expand form if an origin is selected
+        setIsFormExpanded(true);
       }
     });
     return () => {
       listener.remove();
     };
-  }, [placesLib, onPlaceSelect]);
+  }, [placesLib, onPlaceSelect, isFormExpanded]); // isFormExpanded added to re-evaluate if needed, though primary attachment is on ref
 
-  // Autocomplete for Destination (existing, ensure it's preserved)
+  // Autocomplete for Destination
   useEffect(() => {
-    if (!placesLib || !destinationInputRef.current) {
+    if (!placesLib || !destinationInputRef.current || !isFormExpanded) { // Only init if expanded
       return;
     }
     const autocomplete = new placesLib.Autocomplete(destinationInputRef.current, autocompleteOptions);
@@ -84,11 +84,11 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     return () => {
       listener.remove();
     };
-  }, [placesLib, onPlaceSelect]);
+  }, [placesLib, onPlaceSelect, isFormExpanded]);
 
-  // Autocomplete for Stops (existing, ensure it's preserved)
+  // Autocomplete for Stops
   useEffect(() => {
-    if (!placesLib) {
+    if (!placesLib || !isFormExpanded) { // Only init if expanded
       return;
     }
     const activeListeners: google.maps.MapsEventListener[] = [];
@@ -97,21 +97,15 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
       if (inputElement) {
         const autocomplete = new placesLib.Autocomplete(inputElement, autocompleteOptions);
         const listener = autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
+          const placeDetails = autocomplete.getPlace();
+          const newName = placeDetails.formatted_address || placeDetails.name || '';
           setStops(currentStops =>
             currentStops.map(s =>
-              s.id === stop.id
-                ? {
-                    ...s,
-                    name: place.formatted_address || place.name || '',
-                    lat: place.geometry?.location?.lat() || 0,
-                    lng: place.geometry?.location?.lng() || 0,
-                  }
-                : s
+              s.id === stop.id ? { ...s, name: newName, lat: placeDetails.geometry?.location?.lat() || 0, lng: placeDetails.geometry?.location?.lng() || 0 } : s
             )
           );
-          if (onPlaceSelect && place) {
-            onPlaceSelect(place, 'stop', stop.id);
+          if (onPlaceSelect && placeDetails) {
+            onPlaceSelect(placeDetails, 'stop', stop.id);
           }
         });
         activeListeners.push(listener);
@@ -120,7 +114,7 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     return () => {
       activeListeners.forEach(listener => listener.remove());
     };
-  }, [placesLib, stops, onPlaceSelect]);
+  }, [placesLib, stops, onPlaceSelect, isFormExpanded]);
 
   const handleAddStop = () => {
     const newStopId = Date.now().toString();
@@ -130,14 +124,14 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
   };
 
   useEffect(() => {
-    if (lastAddedStopId) {
+    if (lastAddedStopId && isFormExpanded) { // Ensure form is expanded before trying to focus
       const newStopIndex = stops.findIndex(s => s.id === lastAddedStopId);
       if (newStopIndex !== -1 && stopInputRefs.current[newStopIndex]) {
         stopInputRefs.current[newStopIndex]?.focus();
         setLastAddedStopId(null);
       }
     }
-  }, [stops, lastAddedStopId]);
+  }, [stops, lastAddedStopId, isFormExpanded]);
 
   const handleRemoveStop = (stopId: string) => {
     setStops(stops.filter(stop => stop.id !== stopId));
@@ -151,15 +145,11 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     );
   };
 
-  // --- Features from PlanModal.tsx ---
-
   const handlePreview = () => {
     if (onPreviewRoute) {
       onPreviewRoute({ origin, destination, stops });
     }
-    // setShowMobilePreview(true); // This was for PlanModal's specific layout, adjust if needed
     toast({ title: "Previewing Route", description: "Showing the route on the map." });
-    // Actual map preview logic would be handled by the parent component via onPreviewRoute
   };
 
   const handleSave = () => {
@@ -169,7 +159,6 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
       title: "🎉 Route Saved Successfully!",
       description: "Your journey has been created. Let\'s add some memories!",
     });
-    // Here you would typically send the data (routeName, origin, destination, stops) to a backend.
     console.log("Route saved:", { routeName, origin, destination, stops });
   };
 
@@ -192,7 +181,7 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     return () => {
       previewUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [previewUrls]); // Changed dependency to previewUrls
+  }, [previewUrls]);
 
   const finalizeJourney = () => {
     if (selectedPhotos.length > 0) {
@@ -207,17 +196,16 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     setDestination('');
     setStops([]);
     setSelectedPhotos([]);
-    previewUrls.forEach(url => URL.revokeObjectURL(url)); // Ensure cleanup before setting to empty
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
     setPreviewUrls([]);
     setIsSaved(false);
-    // setShowMobilePreview(false);
+    setIsFormExpanded(false); // Reset expansion
     setLastAddedStopId(null);
     toast({ title: "Route Completed! 🎯", description: "Ready to plan your next adventure!" });
+    // onClose(); // Consider if finalizeJourney should also close the modal
   };
   
-  // Close modal and reset basic fields (can be expanded)
   const handleCloseAndReset = () => {
-    // Call a prop to close the modal, e.g., onClose()
     setRouteName('');
     setOrigin('');
     setDestination('');
@@ -226,166 +214,202 @@ export default function PlanModal({ isOpen, onPlaceSelect, onPreviewRoute }: Pro
     previewUrls.forEach(url => URL.revokeObjectURL(url));
     setPreviewUrls([]);
     setIsSaved(false);
-    // setIsOpen(false); // This should be handled by parent via a prop
+    setIsFormExpanded(false); // Reset expanded state
+    setLastAddedStopId(null);
+    onClose(); // Use onClose prop
   };
+
+  // Reset expansion state if modal is closed externally
+  useEffect(() => {
+    if (!isOpen) {
+      setIsFormExpanded(false);
+      // Minimal reset here; handleCloseAndReset is more comprehensive for user-triggered close
+    }
+  }, [isOpen]);
 
 
   if (!isOpen) {
     return null;
   }
 
-  // UI structure adapted from PlanModal.tsx for responsiveness and features
   return (
     <div
       className={cn(
-        "fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center", // Backdrop
-        !isOpen && "hidden"
+        "bg-white z-50 shadow-xl fixed", // Common styles
+        isFormExpanded
+          ? // Expanded State: panel styles
+            "flex flex-col overflow-hidden top-0 left-0 w-full h-full rounded-none " + // Mobile full screen
+            // Desktop: Set left to 100px
+            "md:rounded-lg md:top-4 md:left-[100px] md:w-[400px] md:h-auto md:max-h-[calc(100vh-2rem)]"
+          : // Collapsed State: search bar styles
+            "flex items-center rounded-full top-4 left-1/2 -translate-x-1/2 w-[90vw] max-w-[500px] " + // Mobile centered
+            // Desktop: Set left to 100px
+            "md:left-[100px] md:transform-none md:w-[400px] h-12 px-4"
       )}
-      onClick={handleCloseAndReset} // Optional: close on backdrop click
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className={cn(
-          "bg-white z-50 flex flex-col rounded-lg shadow-xl",
-          "w-[90vw] max-w-[500px] h-auto max-h-[90vh]", // Mobile first
-          "lg:w-[400px] lg:max-w-none", // Desktop size from PlanModal
-          // showMobilePreview ? "lg:h-[60vh]" : "lg:h-auto", // If we implement a similar preview state
-          "overflow-hidden"
-        )}
-        onClick={(e) => e.stopPropagation()} // Prevent backdrop click from closing if clicking inside modal
-      >
-        {/* Header */}
+      {/* Header: Only show if expanded */}
+      {isFormExpanded && (
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-bold">{isSaved ? "Journey Saved" : "Plan Your Route"}</h2>
-          <Button variant="ghost" size="sm" onClick={handleCloseAndReset}>X</Button> {/* Replace with actual close handler */}
+          <h2 className="text-xl font-bold">
+            {isSaved ? "Journey Saved" : "Plan Your Route"}
+          </h2>
+          <Button variant="ghost" size="sm" onClick={handleCloseAndReset}>X</Button>
         </div>
+      )}
 
-        {isSaved ? (
-          // Saved State UI (similar to PlanModal)
-          <div className="p-6 space-y-4 overflow-y-auto">
-            <div className="text-center">
-              <h3 className="text-2xl font-semibold text-green-600">🎉 Success!</h3>
-              <p className="text-gray-600 mt-2">Your route "{routeName}" has been saved.</p>
+      {!isFormExpanded ? (
+        // Simple Search Bar Content (Initial Collapsed State)
+        <div className="flex items-center w-full h-full">
+          {/* Icon placeholder: You can add a SearchIcon component here if you have one */}
+          {/* e.g., <SearchIcon className="h-5 w-5 text-gray-500 mr-3" /> */}
+          <input
+            id="initialSearchOrigin"
+            ref={originInputRef}
+            value={origin}
+            onChange={(e) => {
+              setOrigin(e.target.value);
+            }}
+            onFocus={() => {
+              if (!isFormExpanded) setIsFormExpanded(true);
+            }}
+            className="w-full h-full text-base bg-transparent outline-none placeholder-gray-600"
+            placeholder="Search Google Maps" // Placeholder like the image
+          />
+          {/* Icon placeholder: You can add a DirectionsIcon here if you have one */}
+          {/* e.g., <DirectionsIcon className="h-6 w-6 text-blue-500 ml-3 cursor-pointer" onClick={() => setIsFormExpanded(true)} /> */}
+        </div>
+      ) : (
+        // Expanded Form Content
+        <>
+          {isSaved ? (
+            // Saved State UI
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <div className="text-center">
+                <h3 className="text-2xl font-semibold text-green-600">🎉 Success!</h3>
+                <p className="text-gray-600 mt-2">Your route "{routeName || 'Unnamed Route'}" has been saved.</p>
+              </div>
+              
+              {/* Photo Upload Section */}
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold mb-2">Add Photos to Your Journey</h4>
+                <input
+                  type="file"
+                  multiple
+                  onChange={handlePhotoSelect}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {previewUrls.length > 0 && (
+                  <div className="mt-4 grid grid-cols-3 gap-4">
+                    {previewUrls.map((url, index) => (
+                      <div key={index} className="relative">
+                        <img src={url} alt={`Preview ${index}`} className="rounded-md object-cover h-24 w-full" />
+                        <Button 
+                          variant="destructive" 
+                          size="icon" 
+                          className="absolute top-1 right-1 h-6 w-6" 
+                          onClick={() => removePhoto(index)}
+                        >
+                          &times;
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-8 flex flex-col space-y-3">
+                <Button onClick={finalizeJourney} className="bg-green-500 hover:bg-green-600">
+                  Finalize Journey & Upload Photos
+                </Button>
+                <Button variant="outline" onClick={() => { setIsSaved(false); /* Don't reset isFormExpanded here */ }}>
+                  Edit Route
+                </Button>
+              </div>
             </div>
-            
-            {/* Photo Upload Section */}
-            <div className="mt-6">
-              <h4 className="text-lg font-semibold mb-2">Add Photos to Your Journey</h4>
-              <input
-                type="file"
-                multiple
-                onChange={handlePhotoSelect}
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-              {/* Photo Previews */}
-              {previewUrls.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 gap-4">
-                  {previewUrls.map((url, index) => (
-                    <div key={index} className="relative">
-                      <img src={url} alt={`Preview ${index}`} className="rounded-md object-cover h-24 w-full" />
-                      <button
-                        onClick={() => removePhoto(index)}
-                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 text-xs"
+          ) : (
+            // Planning State UI
+            <>
+              <div className="p-6 space-y-4 overflow-y-auto flex-grow">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1" htmlFor="routeName">Route Name (Optional)</label>
+                  <input
+                    id="routeName"
+                    type="text"
+                    value={routeName}
+                    onChange={(e) => setRouteName(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="e.g., Summer Road Trip"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1" htmlFor="origin">Origin</label>
+                  <input
+                    id="origin" // Different ID from the initial search input
+                    type="text"
+                    ref={originInputRef} // Ref will point to this input when expanded
+                    value={origin}
+                    onChange={(e) => setOrigin(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="Enter origin"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1" htmlFor="destination">Destination</label>
+                  <input
+                    id="destination"
+                    type="text"
+                    ref={destinationInputRef}
+                    value={destination}
+                    onChange={(e) => setDestination(e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="Enter destination"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <h3 className="text-md font-semibold mb-2">Stops (Optional)</h3>
+                  {stops.map((stop, index) => (
+                    <div key={stop.id} className="flex items-center mb-2">
+                      <input
+                        type="text"
+                        ref={el => stopInputRefs.current[index] = el}
+                        value={stop.name}
+                        onChange={(e) => handleStopInputChange(stop.id, e.target.value)}
+                        className="w-full border rounded px-3 py-2 mr-2"
+                        placeholder={`Stop ${index + 1}`}
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleRemoveStop(stop.id)}
                       >
-                        X
-                      </button>
+                        Remove
+                      </Button>
                     </div>
                   ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex flex-col space-y-3">
-              <Button onClick={finalizeJourney} className="bg-green-500 hover:bg-green-600">
-                Finalize Journey & Upload Photos
-              </Button>
-              <Button variant="outline" onClick={() => setIsSaved(false)}>
-                Edit Route
-              </Button>
-            </div>
-          </div>
-        ) : (
-          // Planning State UI
-          <div className="p-6 space-y-4 overflow-y-auto flex-grow">
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1" htmlFor="routeName">Route Name</label>
-              <input
-                id="routeName"
-                type="text"
-                value={routeName}
-                onChange={(e) => setRouteName(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="e.g., Summer Road Trip"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1" htmlFor="origin">Origin</label>
-              <input
-                id="origin"
-                type="text"
-                ref={originInputRef}
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="Enter origin"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-1" htmlFor="destination">Destination</label>
-              <input
-                id="destination"
-                type="text"
-                ref={destinationInputRef}
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                className="w-full border rounded px-3 py-2"
-                placeholder="Enter destination"
-              />
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-md font-semibold mb-2">Stops</h3>
-              {stops.map((stop, index) => (
-                <div key={stop.id} className="flex items-center mb-2">
-                  <input
-                    type="text"
-                    ref={el => stopInputRefs.current[index] = el}
-                    value={stop.name}
-                    onChange={(e) => handleStopInputChange(stop.id, e.target.value)}
-                    className="w-full border rounded px-3 py-2 mr-2"
-                    placeholder={`Stop ${index + 1}`}
-                  />
                   <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleRemoveStop(stop.id)}
+                    onClick={handleAddStop}
+                    variant="outline"
+                    className="mt-2 w-full"
                   >
-                    Remove
+                    Add Stop
                   </Button>
                 </div>
-              ))}
-              <Button
-                onClick={handleAddStop}
-                variant="outline"
-                className="mt-2 w-full"
-              >
-                Add Stop
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Footer Actions (only in planning mode) */}
-        {!isSaved && (
-          <div className="p-4 border-t flex justify-end space-x-3">
-            <Button variant="outline" onClick={handlePreview}>
-              Preview Route
-            </Button>
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
-              Save Route
-            </Button>
-          </div>
-        )}
-      </div>
+              </div>
+              {/* Footer Actions (only in planning mode and when form is expanded) */}
+              <div className="p-4 border-t flex justify-end space-x-3">
+                <Button variant="outline" onClick={handlePreview} disabled={!origin.trim() || !destination.trim()}>
+                  Preview Route
+                </Button>
+                <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700" disabled={!origin.trim() || !destination.trim()}>
+                  Save Route
+                </Button>
+              </div>
+            </>
+          )}
+        </>
+      )}
     </div>
   )
 }
