@@ -4,7 +4,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 import MapSidebar from '@/components/MapSidebar';
 import UserAvatar from '@/components/UserAvatar';
-import PlanModal from '@/components/PlanModal';
+import PlanModal from '@/components/NewPlanModal';
 
 interface RoutePoint {
   origin: string;
