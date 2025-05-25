@@ -35,6 +35,6 @@ jobs:
           rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/backend ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/
           rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/config/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/config/
 
-      - name: Restart backend service on EC2
+      - name: Restart or start backend service on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'sudo systemctl restart mapmymoments-backend.service'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'sudo systemctl restart mapmymoments-backend.service || sudo systemctl start mapmymoments-backend.service'
