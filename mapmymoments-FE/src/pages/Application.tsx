@@ -68,6 +68,7 @@ const Application = () => {
           <PlanModal 
             isOpen={activeTab === 'plan'} 
             onPreviewRoute={handlePreviewRoute}
+            onClose={() => setActiveTab('route')}
           />
           <div className="absolute top-4 right-4 z-50">
             <UserAvatar
