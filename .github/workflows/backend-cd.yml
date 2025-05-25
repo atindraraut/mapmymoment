@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'mapmymoments-BE/**'
+  workflow_dispatch:
 
 jobs:
   deploy:
