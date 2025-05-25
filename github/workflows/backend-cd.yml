@@ -1,0 +1,39 @@
+name: Backend CD
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'mapmymoments-BE/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_KEY }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build Go binary
+        run: |
+          cd mapmymoments-BE
+          go build -o backend ./cmd/routes-api/main.go
+
+      - name: Copy binary and config to EC2
+        run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/backend ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/config/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/config/
+
+      - name: Restart backend service on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'sudo systemctl restart mapmymoments-backend.service'
