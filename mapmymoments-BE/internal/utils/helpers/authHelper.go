@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"net/smtp"
 	"os"
 	"time"
 
 	"github.com/atindraraut/crudgo/internal/types"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -62,12 +64,17 @@ func VerifyToken(tokenStr string) (details *types.SignedDetails, msg string) {
 
 // SendEmailOTP sends a beautiful HTML email with a copyable OTP for your travel app
 func SendEmailOTP(email, otp string) error {
-	// Mailtrap credentials
-	auth := smtp.PlainAuth("", "api", "3df85c226c7a33228c1528f16dc257fd", "live.smtp.mailtrap.io")
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"), // Replace with your AWS region
+	})
+	if err != nil {
+		slog.Error("Failed to create AWS session", err)
+		return err
+	}
 
-	to := []string{email}
-	from := "hello@demomailtrap.co"
+	svc := ses.New(sess)
 
+	subject := "Your MapMyMoments OTP Code"
 	htmlBody := `
 <!DOCTYPE html>
 <html>
@@ -82,9 +89,6 @@ func SendEmailOTP(email, otp string) error {
     .title { color: #1e293b; font-size: 1.35rem; font-weight: 600; text-align: center; margin-bottom: 6px; letter-spacing: 0.01em; }
     .subtitle { color: #475569; text-align: center; margin-bottom: 22px; font-size: 1rem; font-weight: 400; }
     .otp-box { background: #f1f5f9; border-radius: 6px; padding: 14px 0; text-align: center; font-size: 1.7rem; font-weight: 600; letter-spacing: 0.28em; color: #0f172a; margin-bottom: 12px; font-family: 'Fira Mono', 'Consolas', monospace; user-select: all; border: 1px solid #e2e8f0; }
-    .copy-btn { display: inline-block; background: #2563eb; color: #fff; border: none; border-radius: 5px; padding: 7px 20px; font-size: 1rem; font-weight: 500; cursor: pointer; margin: 0 auto; transition: background 0.2s; }
-    .copy-btn:hover { background: #1d4ed8; }
-    .copy-note { color: #64748b; font-size: 0.95rem; text-align: center; margin-top: 7px; }
     .footer { color: #64748b; font-size: 0.95rem; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 18px; }
   </style>
 </head>
@@ -96,10 +100,6 @@ func SendEmailOTP(email, otp string) error {
     <div class="title">Your OTP for MapMyMoments</div>
     <div class="subtitle">Enter this code to verify your email and continue your journey.</div>
     <div class="otp-box" id="otp">` + otp + `</div>
-    <div style="text-align:center;">
-      <button class="copy-btn" onclick="navigator.clipboard && navigator.clipboard.writeText && navigator.clipboard.writeText('` + otp + `')">Copy OTP</button>
-      <div class="copy-note">If the button doesn't work, please select and copy the code above.</div>
-    </div>
     <div class="footer">
       This OTP is valid for 10 minutes.<br>
       If you did not request this, you can safely ignore this email.<br><br>
@@ -110,13 +110,28 @@ func SendEmailOTP(email, otp string) error {
 </html>
 `
 
-	msg := []byte("From: " + from + "\r\n" +
-		"To: " + email + "\r\n" +
-		"Subject: Your MapMyMoments OTP Code\r\n" +
-		"MIME-version: 1.0;\r\nContent-Type: text/html; charset=\"UTF-8\";\r\n\r\n" +
-		htmlBody)
+	input := &ses.SendEmailInput{
+		Destination: &ses.Destination{
+			ToAddresses: []*string{
+				aws.String(email),
+			},
+		},
+		Message: &ses.Message{
+			Body: &ses.Body{
+				Html: &ses.Content{
+					Charset: aws.String("UTF-8"),
+					Data:    aws.String(htmlBody),
+				},
+			},
+			Subject: &ses.Content{
+				Charset: aws.String("UTF-8"),
+				Data:    aws.String(subject),
+			},
+		},
+		Source: aws.String("hello@mapmymoments.in"), // Replace with your verified SES email
+	}
 
-	err := smtp.SendMail("live.smtp.mailtrap.io:587", auth, from, to, msg)
+	_, err = svc.SendEmail(input)
 	if err != nil {
 		slog.Error("Failed to send email", err)
 		return err
