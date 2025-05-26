@@ -33,7 +33,6 @@ jobs:
       - name: Copy binary and config to EC2
         run: |
           rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/backend ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-BE/config/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/backend/config/
 
       - name: Restart or start backend service on EC2
         run: |
