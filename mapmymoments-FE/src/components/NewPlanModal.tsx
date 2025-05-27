@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils"; // Assuming cn is here
 import { Button } from "@/components/ui/button"; // Assuming Button is here
 import { useToast } from "@/hooks/use-toast"; // Assuming useToast is here
-import confetti from 'confetti-js'; // Added confetti
 import { useState, useEffect, useRef, ReactNode } from 'react'; // Explicit React imports
 import { useMapsLibrary } from '@vis.gl/react-google-maps'; // Assuming this is the correct import path
 
@@ -154,7 +153,6 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
 
   const handleSave = () => {
     setIsSaved(true);
-    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     toast({
       title: "🎉 Route Saved Successfully!",
       description: "Your journey has been created. Let\'s add some memories!",
@@ -185,7 +183,6 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
 
   const finalizeJourney = () => {
     if (selectedPhotos.length > 0) {
-      confetti({ particleCount: 200, spread: 160, origin: { y: 0.6 }, colors: ['#FF9B9B', '#FFB5B5', '#FFD1D1', '#FFE3E3'] });
       toast({ title: "Journey Complete! 🎉", description: "Your photos are being uploaded." });
       // TODO: Handle actual photo upload (e.g., to AWS S3)
       console.log("Uploading photos:", selectedPhotos);

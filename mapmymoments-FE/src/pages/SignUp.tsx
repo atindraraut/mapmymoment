@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from 'react-router-dom';
+import { apiFetch } from "@/lib/api";
 
 const SignUp = () => {
   const [form, setForm] = useState({
@@ -37,7 +38,8 @@ const SignUp = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch('/user/signup', {
+
+      const res = await apiFetch('/user/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -46,7 +48,7 @@ const SignUp = () => {
           first_name: form.first_name,
           last_name: form.last_name
         })
-      });
+      }, false);
       const data = await res.json();
       if (res.ok) {
         setStep('otp');

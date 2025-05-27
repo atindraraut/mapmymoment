@@ -5,7 +5,7 @@ export function useRefreshToken() {
     const refresh_token = localStorage.getItem('refresh_token');
     if (!refresh_token) return null;
     try {
-      const res = await fetch('http://localhost:8080/user/refresh', {
+      const res = await fetch('/user/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token })
