@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button"; // Assuming Button is here
 import { useToast } from "@/hooks/use-toast"; // Assuming useToast is here
 import { useState, useEffect, useRef, ReactNode } from 'react'; // Explicit React imports
 import { useMapsLibrary } from '@vis.gl/react-google-maps'; // Assuming this is the correct import path
+import { useDispatch } from 'react-redux';
+import { AppDispatch } from '@/store';
+import { setRouteName } from '@/store/routeSlice';
 
 // Added Stop interface
 interface Stop {
@@ -22,7 +25,8 @@ type Props = {
 
 export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, onClose }: Props) {
   const { toast } = useToast();
-  const [routeName, setRouteName] = useState('');
+  const dispatch: AppDispatch = useDispatch();
+  const [routeName, updateRouteName] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [stops, setStops] = useState<Stop[]>([]);
