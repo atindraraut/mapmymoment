@@ -1,0 +1,39 @@
+name: Frontend CD
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'mapmymoments-FE/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd mapmymoments-FE
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd mapmymoments-FE
+          npm run build
+
+      - name: Copy build files to EC2
+        run: |
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no" mapmymoments-FE/dist/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/mapmymoments/frontend/
+
+      - name: Restart Nginx on EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} 'sudo systemctl restart nginx'
