@@ -18,21 +18,6 @@ import (
 	"github.com/atindraraut/crudgo/storage/mongodb"
 )
 
-// CORS middleware
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
 func main() {
 	//load config
 	cfg := config.MustLoadConfig()
@@ -44,8 +29,9 @@ func main() {
 	//setup routes
 	router := http.NewServeMux()
 	//setup middleware
-	handleCORS := corsMiddleware(router)
-	handleTimeTracker := middleware.TimeTracker(handleCORS)
+	handleCORS := middleware.CorsMiddleware(router)
+	handleRateLimiter := middleware.RateLimiter(handleCORS)
+	handleTimeTracker := middleware.TimeTracker(handleRateLimiter)
 	// Register grouped routes
 
 	public.RegisterRoutes(router, storage)

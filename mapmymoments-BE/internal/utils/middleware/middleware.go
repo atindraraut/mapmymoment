@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	auth "github.com/atindraraut/crudgo/internal/utils/helpers"
@@ -19,6 +20,95 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+// CORS middleware
+func CorsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RateLimiter middleware to limit requests per IP
+func RateLimiter(next http.Handler) http.Handler {
+	// Set rate limit: 100 requests per minute per IP
+	const maxRequests = 100
+	const windowSeconds = 60
+
+	// Store for tracking request counts per IP
+	type client struct {
+		count    int
+		lastSeen time.Time
+	}
+
+	// Thread-safe map to track clients
+	var (
+		clients = make(map[string]*client)
+		mu      sync.Mutex
+	)
+
+	// Cleanup goroutine to prevent memory leaks
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			mu.Lock()
+			for ip, client := range clients {
+				if time.Since(client.lastSeen) > time.Minute*5 {
+					delete(clients, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get client IP
+		ip := r.RemoteAddr
+		if fwdIP := r.Header.Get("X-Forwarded-For"); fwdIP != "" {
+			// Use the first IP in X-Forwarded-For if available
+			ip = strings.Split(fwdIP, ",")[0]
+		} else {
+			// Remove port from IP if present
+			ip = strings.Split(ip, ":")[0]
+		}
+
+		mu.Lock()
+		if clients[ip] == nil {
+			clients[ip] = &client{count: 0, lastSeen: time.Now()}
+		}
+
+		// Reset counter if window has passed
+		if time.Since(clients[ip].lastSeen).Seconds() > windowSeconds {
+			clients[ip].count = 0
+			clients[ip].lastSeen = time.Now()
+		}
+
+		// Increment counter
+		clients[ip].count++
+		count := clients[ip].count       // Store count for logging
+		lastSeen := clients[ip].lastSeen // Store lastSeen for logging
+		exceeded := count > maxRequests
+		mu.Unlock()
+
+		// Log after incrementing
+		slog.Warn("RateLimiter: Client IP", slog.String("ip", ip), slog.Int("count", count), slog.Time("lastSeen", lastSeen))
+
+		if exceeded {
+			w.WriteHeader(http.StatusTooManyRequests)
+			w.Write([]byte("Rate limit exceeded. Try again later."))
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // TimeTracker logs the duration and status code of each request
