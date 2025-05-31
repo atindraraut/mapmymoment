@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -34,6 +35,7 @@ require (
 	go.mongodb.org/mongo-driver v1.17.3 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect

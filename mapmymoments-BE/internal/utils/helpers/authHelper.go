@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/atindraraut/crudgo/internal/types"
@@ -12,11 +14,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/oauth2"
+	"encoding/json"
 )
 
 var SECRET_KEY string = os.Getenv("SECRET_KEY")
 
-func GenerateAllTokens(email, first_name, last_name, uid string) (string, string, error) {
+func GenerateAllTokens(email, first_name, last_name, uid string, forOAuth bool) (interface{}, string, error) {
 	claims := &types.SignedDetails{
 		Email:      email,
 		First_name: first_name,
@@ -39,12 +43,23 @@ func GenerateAllTokens(email, first_name, last_name, uid string) (string, string
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 	signedToken, err := token.SignedString([]byte(SECRET_KEY))
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
 	signedRefreshToken, err := refreshToken.SignedString([]byte(SECRET_KEY))
 	if err != nil {
-		return "", "", err
+		return nil, "", err
 	}
+
+	if forOAuth {
+		// Return an *oauth2.Token object for OAuth flows
+		return &oauth2.Token{
+			AccessToken:  signedToken,
+			RefreshToken: signedRefreshToken,
+			Expiry:       time.Now().Add(time.Minute * 15),
+		}, signedRefreshToken, nil
+	}
+
+	// Return JWT tokens for non-OAuth flows
 	return signedToken, signedRefreshToken, nil
 }
 
@@ -62,13 +77,44 @@ func VerifyToken(tokenStr string) (details *types.SignedDetails, msg string) {
 	return claims, "nil"
 }
 
+// VerifyOAuthToken validates an OAuth token
+func VerifyOAuthToken(tokenStr string) bool {
+	// Define the Google OAuth userinfo endpoint
+	userinfoEndpoint := "https://www.googleapis.com/oauth2/v3/tokeninfo"
+
+	// Make a GET request to validate the token
+	resp, err := http.Get(userinfoEndpoint + "?access_token=" + tokenStr)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	// Check if the response status is OK
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+
+	// Optionally, parse the response to extract and validate claims
+	var userInfo map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return false
+	}
+
+	// Ensure the token contains required claims (e.g., email, expiry)
+	if _, ok := userInfo["email"]; !ok {
+		return false
+	}
+
+	return true
+}
+
 // SendEmailOTP sends a beautiful HTML email with a copyable OTP for your travel app
 func SendEmailOTP(email, otp string) error {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("us-east-1"), // Replace with your AWS region
 	})
 	if err != nil {
-		slog.Error("Failed to create AWS session", err)
+		slog.Error("Failed to create AWS session", slog.String("error", err.Error()))
 		return err
 	}
 
@@ -133,7 +179,7 @@ func SendEmailOTP(email, otp string) error {
 
 	_, err = svc.SendEmail(input)
 	if err != nil {
-		slog.Error("Failed to send email", err)
+		slog.Error("Failed to send email", slog.String("error", err.Error()))
 		return err
 	}
 
@@ -143,4 +189,18 @@ func SendEmailOTP(email, otp string) error {
 
 func GenerateOTP() string {
 	return fmt.Sprintf("%06d", rand.Intn(1000000))
+}
+
+func HandleOAuthTokenErrors(err error) string {
+	if err != nil {
+		switch {
+		case strings.Contains(err.Error(), "invalid_token"):
+			return "Invalid token. Please log in again."
+		case strings.Contains(err.Error(), "token_expired"):
+			return "Token expired. Please refresh your token."
+		default:
+			return "An unknown error occurred. Please try again."
+		}
+	}
+	return ""
 }

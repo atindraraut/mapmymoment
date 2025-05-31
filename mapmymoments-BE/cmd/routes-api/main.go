@@ -37,6 +37,9 @@ func main() {
 	public.RegisterRoutes(router, storage)
 	routes.RegisterRoutes(router, storage)
 	user.RegisterRoutes(router, storage)
+	// Register OAuth routes
+	router.HandleFunc("/oauth/google/login", user.GoogleLoginHandler)
+	router.HandleFunc("/oauth/google/callback", user.GoogleCallbackHandler(storage))
 	//setup server
 	server := &http.Server{
 		Addr:    cfg.HTTPServer.ADDR,

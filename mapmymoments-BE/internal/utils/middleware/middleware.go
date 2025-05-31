@@ -142,25 +142,35 @@ func AuthMiddleware(storage storage.Storage) Middleware {
 				return
 			}
 			tokenStr := strings.TrimPrefix(header, "Bearer ")
+			// Check if the token is a JWT
 			details, msg := auth.VerifyToken(tokenStr)
-			if msg != "nil" {
-				http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			if msg == "nil" {
+				// JWT token is valid, fetch user from DB
+				userData, err := storage.GetUserByEmail(details.Email)
+				if err != nil {
+					http.Error(w, "User not found", http.StatusUnauthorized)
+					return
+				}
+				user := &AuthUser{
+					Email:     userData.Email,
+					FirstName: userData.FirstName,
+					LastName:  userData.LastName,
+					Uid:       userData.Email, // Use Email as UID since UserData has no Uid field
+				}
+				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-			// Fetch user from DB using storage interface
-			userData, err := storage.GetUserByEmail(details.Email)
-			if err != nil {
-				http.Error(w, "User not found", http.StatusUnauthorized)
+
+			// Check if the token is an OAuth token
+			if auth.VerifyOAuthToken(tokenStr) {
+				// OAuth token is valid, proceed without fetching user from DB
+				next.ServeHTTP(w, r)
 				return
 			}
-			user := &AuthUser{
-				Email:     userData.Email,
-				FirstName: userData.FirstName,
-				LastName:  userData.LastName,
-				Uid:       userData.Email, // Use Email as UID since UserData has no Uid field
-			}
-			ctx := context.WithValue(r.Context(), UserContextKey, user)
-			next.ServeHTTP(w, r.WithContext(ctx))
+
+			// If neither is valid, return unauthorized
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
 		})
 	}
 }

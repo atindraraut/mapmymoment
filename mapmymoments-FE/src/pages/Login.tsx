@@ -71,6 +71,16 @@ const Login = () => {
               </div>
               <Button className="w-full bg-primary text-white hover:bg-primary/90 py-2 text-lg rounded" disabled={loading}>{loading ? 'Logging In...' : 'Log In'}</Button>
             </form>
+            <div className="mt-4">
+              <Button
+                className="w-full bg-red-500 text-white hover:bg-red-600 py-2 text-lg rounded"
+                onClick={() => {
+                  window.location.href = 'http://localhost:8080/oauth/google/login'; // Redirect to backend OAuth login endpoint
+                }}
+              >
+                Login with Google
+              </Button>
+            </div>
             <p className="mt-6 text-center text-sm text-foreground/80">
               <Link to="/" className="text-primary hover:underline mr-4">Home</Link>
               <span>|</span>

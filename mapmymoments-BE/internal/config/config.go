@@ -18,6 +18,8 @@ type Config struct {
 	SECRET_KEY    string `yaml:"secret_key" env-required:"true"`
 	MongoURI      string `yaml:"mongo_uri" env-required:"true"`
 	MongoDatabase string `yaml:"mongo_db" env-required:"true"`
+    GOOGLE_CLIENT_ID string `yaml:"oauth_client_id" env-required:"true"`
+    GOOGLE_CLIENT_SECRET string `yaml:"oauth_client_secret" env-required:"true"`
 }
 
 func MustLoadConfig() *Config {
