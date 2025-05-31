@@ -5,6 +5,7 @@ import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import store from '@/store';
+import { cn } from '@/lib/utils';
 
 import MapSidebar from '@/components/MapSidebar';
 import UserAvatar from '@/components/UserAvatar';
@@ -26,6 +27,7 @@ const Application = () => {
   useAuthGuard();
   const [activeTab, setActiveTab] = useState<'plan' | 'route'>('plan');
   const [routePreview, setRoutePreview] = useState<RoutePoint | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   
   const [userData, setUserData] = useState({
     firstName: localStorage.getItem('first_name') || '',
@@ -69,13 +71,23 @@ const Application = () => {
             <MapSidebar 
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              firstName={userData.firstName}
+              lastName={userData.lastName}
+              email={userData.email}
+              onLogout={handleLogout}
+              isProfileOpen={isProfileOpen}
+              onProfileToggle={setIsProfileOpen}
             />
             <PlanModal 
-              isOpen={activeTab === 'plan'} 
+              isOpen={activeTab === 'plan' && !isProfileOpen} 
               onPreviewRoute={handlePreviewRoute}
               onClose={() => setActiveTab('route')}
             />
-            <div className="absolute top-4 right-4 z-50">
+            <div className={cn(
+              "absolute z-50",
+              // Hide on mobile, show on desktop at top-right
+              "hidden lg:block lg:top-4 lg:right-4"
+            )}>
               <UserAvatar
                 firstName={userData.firstName}
                 lastName={userData.lastName}

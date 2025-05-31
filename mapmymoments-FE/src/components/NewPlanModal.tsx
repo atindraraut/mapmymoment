@@ -1,35 +1,54 @@
-import { cn } from "@/lib/utils"; // Assuming cn is here
-import { Button } from "@/components/ui/button"; // Assuming Button is here
-import { useToast } from "@/hooks/use-toast"; // Assuming useToast is here
-import { useState, useEffect, useRef, ReactNode } from 'react'; // Explicit React imports
-import { useMapsLibrary } from '@vis.gl/react-google-maps'; // Assuming this is the correct import path
-import { useDispatch } from 'react-redux';
-import { AppDispatch } from '@/store';
-import { setRouteName } from '@/store/routeSlice';
-
-// Added Stop interface
-interface Stop {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-}
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect, useRef, ReactNode } from 'react';
+import { useMapsLibrary } from '@vis.gl/react-google-maps';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '@/store';
+import { 
+  setRouteName, 
+  setOrigin, 
+  setDestination, 
+  setStops,
+  type Place,
+  type Stop
+} from '@/store/routeSlice';
 
 type Props = {
   isOpen: boolean;
   children?: ReactNode;
   onPlaceSelect?: (place: google.maps.places.PlaceResult | null, type: 'origin' | 'destination' | 'stop', stopId?: string) => void;
   onPreviewRoute?: (points: { origin: string; destination: string; stops: Stop[] }) => void;
-  onClose: () => void; // Added onClose prop to manage modal visibility from parent
+  onClose: () => void;
 }
 
 export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, onClose }: Props) {
   const { toast } = useToast();
-  const dispatch: AppDispatch = useDispatch();
-  const [routeName, updateRouteName] = useState('');
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [stops, setStops] = useState<Stop[]>([]);
+  const dispatch = useDispatch<AppDispatch>();
+  
+  // Get state from Redux store
+  const routeName = useSelector((state: RootState) => state.route.routeName);
+  const origin = useSelector((state: RootState) => state.route.origin);
+  const destination = useSelector((state: RootState) => state.route.destination);
+  const stops = useSelector((state: RootState) => state.route.stops);
+
+  // Local state for input values (what user is typing)
+  const [originInputValue, setOriginInputValue] = useState('');
+  const [destinationInputValue, setDestinationInputValue] = useState('');
+
+  // Update input values when Redux state changes
+  useEffect(() => {
+    setOriginInputValue(origin?.name || '');
+  }, [origin]);
+
+  useEffect(() => {
+    setDestinationInputValue(destination?.name || '');
+  }, [destination]);
+
+  // Debug: Log Redux state changes
+  useEffect(() => {
+    console.log('Redux state changed:', { routeName, origin, destination, stops });
+  }, [routeName, origin, destination, stops]);
 
   const originInputRef = useRef<HTMLInputElement>(null);
   const destinationInputRef = useRef<HTMLInputElement>(null);
@@ -39,8 +58,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   const [isSaved, setIsSaved] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [isFormExpanded, setIsFormExpanded] = useState(false); // New state for UI expansion
-
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
 
   const placesLib = useMapsLibrary('places');
 
@@ -57,100 +75,147 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     const autocomplete = new placesLib.Autocomplete(originInputRef.current, autocompleteOptions);
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-      const newOrigin = place.formatted_address || place.name || '';
-      setOrigin(newOrigin);
-      if (onPlaceSelect && place) {
-        onPlaceSelect(place, 'origin');
-      }
-      if (newOrigin && !isFormExpanded) { // Expand form if an origin is selected
-        setIsFormExpanded(true);
+      if (place.geometry?.location) {
+        const newOrigin: Place = {
+          id: `wp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          name: place.name || '',
+          address: place.formatted_address || ''
+        };
+        // Dispatch to Redux immediately
+        dispatch(setOrigin(newOrigin));
+        if (onPlaceSelect && place) {
+          onPlaceSelect(place, 'origin');
+        }
+        // Expand form if not already expanded
+        if (!isFormExpanded) {
+          setIsFormExpanded(true);
+        }
       }
     });
     return () => {
       listener.remove();
     };
-  }, [placesLib, onPlaceSelect, isFormExpanded]); // isFormExpanded added to re-evaluate if needed, though primary attachment is on ref
+  }, [placesLib, onPlaceSelect, isFormExpanded, dispatch]);
+
+  // Auto-focus on origin input when form expands
+  useEffect(() => {
+    if (isFormExpanded && originInputRef.current) {
+      // Small delay to ensure the form is rendered
+      setTimeout(() => {
+        originInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isFormExpanded]);
 
   // Autocomplete for Destination
   useEffect(() => {
-    if (!placesLib || !destinationInputRef.current || !isFormExpanded) { // Only init if expanded
+    if (!placesLib || !destinationInputRef.current || !isFormExpanded) {
       return;
     }
     const autocomplete = new placesLib.Autocomplete(destinationInputRef.current, autocompleteOptions);
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-      setDestination(place.formatted_address || place.name || '');
-      if (onPlaceSelect && place) {
-        onPlaceSelect(place, 'destination');
+      if (place.geometry?.location) {
+        const newDestination: Place = {
+          id: `wp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+          name: place.name || '',
+          address: place.formatted_address || ''
+        };
+        // Dispatch to Redux immediately
+        dispatch(setDestination(newDestination));
+        if (onPlaceSelect && place) {
+          onPlaceSelect(place, 'destination');
+        }
       }
     });
     return () => {
       listener.remove();
     };
-  }, [placesLib, onPlaceSelect, isFormExpanded]);
+  }, [placesLib, onPlaceSelect, isFormExpanded, dispatch]);
 
   // Autocomplete for Stops
   useEffect(() => {
-    if (!placesLib || !isFormExpanded) { // Only init if expanded
+    if (!placesLib || !isFormExpanded) {
       return;
     }
     const activeListeners: google.maps.MapsEventListener[] = [];
+
     stops.forEach((stop, index) => {
       const inputElement = stopInputRefs.current[index];
       if (inputElement) {
         const autocomplete = new placesLib.Autocomplete(inputElement, autocompleteOptions);
         const listener = autocomplete.addListener("place_changed", () => {
           const placeDetails = autocomplete.getPlace();
-          const newName = placeDetails.formatted_address || placeDetails.name || '';
-          setStops(currentStops =>
-            currentStops.map(s =>
-              s.id === stop.id ? { ...s, name: newName, lat: placeDetails.geometry?.location?.lat() || 0, lng: placeDetails.geometry?.location?.lng() || 0 } : s
-            )
-          );
-          if (onPlaceSelect && placeDetails) {
-            onPlaceSelect(placeDetails, 'stop', stop.id);
+          if (placeDetails.geometry?.location) {
+            const updatedStops = stops.map(s =>
+              s.id === stop.id ? { 
+                ...s, 
+                name: placeDetails.name || placeDetails.formatted_address || '',
+                lat: placeDetails.geometry!.location!.lat(),
+                lng: placeDetails.geometry!.location!.lng()
+              } : s
+            );
+            dispatch(setStops(updatedStops));
+            if (onPlaceSelect && placeDetails) {
+              onPlaceSelect(placeDetails, 'stop', stop.id);
+            }
           }
         });
         activeListeners.push(listener);
       }
     });
+
     return () => {
       activeListeners.forEach(listener => listener.remove());
     };
-  }, [placesLib, stops, onPlaceSelect, isFormExpanded]);
+  }, [placesLib, stops.length, onPlaceSelect, isFormExpanded, dispatch]);
 
   const handleAddStop = () => {
     const newStopId = Date.now().toString();
     const newStop: Stop = { id: newStopId, name: '', lat: 0, lng: 0 };
-    setStops([...stops, newStop]);
+    dispatch(setStops([...stops, newStop]));
     setLastAddedStopId(newStopId);
   };
 
   useEffect(() => {
-    if (lastAddedStopId && isFormExpanded) { // Ensure form is expanded before trying to focus
+    if (lastAddedStopId && isFormExpanded) {
       const newStopIndex = stops.findIndex(s => s.id === lastAddedStopId);
-      if (newStopIndex !== -1 && stopInputRefs.current[newStopIndex]) {
-        stopInputRefs.current[newStopIndex]?.focus();
+      if (newStopIndex !== -1) {
+        const stopToFocus = stops[newStopIndex];
+        // Only focus if this is truly a new empty stop, not an updated one
+        if (stopToFocus.name === '' && stopToFocus.lat === 0 && stopToFocus.lng === 0) {
+          stopInputRefs.current[newStopIndex]?.focus();
+        }
+        // Clear the lastAddedStopId after attempting to focus
         setLastAddedStopId(null);
       }
     }
   }, [stops, lastAddedStopId, isFormExpanded]);
 
   const handleRemoveStop = (stopId: string) => {
-    setStops(stops.filter(stop => stop.id !== stopId));
+    const updatedStops = stops.filter(stop => stop.id !== stopId);
+    dispatch(setStops(updatedStops));
   };
 
   const handleStopInputChange = (id: string, value: string) => {
-    setStops(currentStops =>
-      currentStops.map(stop =>
-        stop.id === id ? { ...stop, name: value } : stop
-      )
+    // Only update the name when user types manually, preserve existing coordinates
+    const updatedStops = stops.map(stop =>
+      stop.id === id ? { ...stop, name: value } : stop
     );
+    dispatch(setStops(updatedStops));
   };
 
   const handlePreview = () => {
-    if (onPreviewRoute) {
-      onPreviewRoute({ origin, destination, stops });
+    if (onPreviewRoute && origin && destination) {
+      onPreviewRoute({ 
+        origin: origin.name, 
+        destination: destination.name, 
+        stops 
+      });
     }
     toast({ title: "Previewing Route", description: "Showing the route on the map." });
   };
@@ -159,14 +224,37 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     setIsSaved(true);
     toast({
       title: "🎉 Route Saved Successfully!",
-      description: "Your journey has been created. Let\'s add some memories!",
+      description: "Your route has been saved. Add photos or plan another route.",
     });
     console.log("Route saved:", { routeName, origin, destination, stops });
+  };
+
+  const handleResetForNewRoute = () => {
+    // Reset Redux state for new route
+    dispatch(setRouteName(''));
+    dispatch(setOrigin(null));
+    dispatch(setDestination(null));
+    dispatch(setStops([]));
+    
+    // Reset local state
+    setIsSaved(false);
+    setSelectedPhotos([]);
+    setPreviewUrls([]);
+    setIsFormExpanded(false);
+    
+    // Clear photo URLs
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    
+    toast({
+      title: "Ready for Next Route! 🚀",
+      description: "Plan another amazing journey.",
+    });
   };
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setSelectedPhotos(prev => [...prev, ...files]);
+    
     const newPreviewUrls = files.map(file => URL.createObjectURL(file));
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
   };
@@ -188,229 +276,311 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   const finalizeJourney = () => {
     if (selectedPhotos.length > 0) {
       toast({ title: "Journey Complete! 🎉", description: "Your photos are being uploaded." });
-      // TODO: Handle actual photo upload (e.g., to AWS S3)
-      console.log("Uploading photos:", selectedPhotos);
     }
-    // Reset state
-    setRouteName('');
-    setOrigin('');
-    setDestination('');
-    setStops([]);
-    setSelectedPhotos([]);
+    
+    // Clean up photo URLs
     previewUrls.forEach(url => URL.revokeObjectURL(url));
-    setPreviewUrls([]);
-    setIsSaved(false);
-    setIsFormExpanded(false); // Reset expansion
-    setLastAddedStopId(null);
-    toast({ title: "Route Completed! 🎯", description: "Ready to plan your next adventure!" });
-    // onClose(); // Consider if finalizeJourney should also close the modal
-  };
-  
-  const handleCloseAndReset = () => {
-    setRouteName('');
-    setOrigin('');
-    setDestination('');
-    setStops([]);
-    setSelectedPhotos([]);
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
-    setPreviewUrls([]);
-    setIsSaved(false);
-    setIsFormExpanded(false); // Reset expanded state
-    setLastAddedStopId(null);
-    onClose(); // Use onClose prop
+    
+    // Reset for new route
+    handleResetForNewRoute();
   };
 
-  // Reset expansion state if modal is closed externally
+  const handleCollapseModal = () => {
+    // Reset Redux state
+    dispatch(setRouteName(''));
+    dispatch(setOrigin(null));
+    dispatch(setDestination(null));
+    dispatch(setStops([]));
+    
+    // Reset local state
+    setIsSaved(false);
+    setSelectedPhotos([]);
+    setPreviewUrls([]);
+    setIsFormExpanded(false);
+    
+    // Clear input values
+    setOriginInputValue('');
+    setDestinationInputValue('');
+    
+    // Clean up photo URLs
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+  };
+
+  const handleCloseAndReset = () => {
+    dispatch(setRouteName(''));
+    dispatch(setOrigin(null));
+    dispatch(setDestination(null));
+    dispatch(setStops([]));
+    setIsSaved(false);
+    setSelectedPhotos([]);
+    setPreviewUrls([]);
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    onClose();
+  };
+
   useEffect(() => {
     if (!isOpen) {
       setIsFormExpanded(false);
-      // Minimal reset here; handleCloseAndReset is more comprehensive for user-triggered close
     }
   }, [isOpen]);
-
 
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div
-      className={cn(
-        "bg-white z-50 shadow-xl fixed", // Common styles
-        isFormExpanded
-          ? // Expanded State: panel styles
-            "flex flex-col overflow-hidden top-0 left-0 w-full h-full rounded-none " + // Mobile full screen
-            // Desktop: Set left to 100px
-            "md:rounded-lg md:top-4 md:left-[100px] md:w-[400px] md:h-auto md:max-h-[calc(100vh-2rem)]"
-          : // Collapsed State: search bar styles
-            "flex items-center rounded-full top-4 left-1/2 -translate-x-1/2 w-[90vw] max-w-[500px] " + // Mobile centered
-            // Desktop: Set left to 100px
-            "md:left-[100px] md:transform-none md:w-[400px] h-12 px-4"
-      )}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Header: Only show if expanded */}
-      {isFormExpanded && (
-        <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-bold">
-            {isSaved ? "Journey Saved" : "Plan Your Route"}
-          </h2>
-          <Button variant="ghost" size="sm" onClick={handleCloseAndReset}>X</Button>
-        </div>
-      )}
-
-      {!isFormExpanded ? (
-        // Simple Search Bar Content (Initial Collapsed State)
-        <div className="flex items-center w-full h-full">
-          {/* Icon placeholder: You can add a SearchIcon component here if you have one */}
-          {/* e.g., <SearchIcon className="h-5 w-5 text-gray-500 mr-3" /> */}
-          <input
-            id="initialSearchOrigin"
-            ref={originInputRef}
-            value={origin}
-            onChange={(e) => {
-              setOrigin(e.target.value);
-            }}
-            onFocus={() => {
-              if (!isFormExpanded) setIsFormExpanded(true);
-            }}
-            className="w-full h-full text-base bg-transparent outline-none placeholder-gray-600"
-            placeholder="Search Google Maps" // Placeholder like the image
-          />
-          {/* Icon placeholder: You can add a DirectionsIcon here if you have one */}
-          {/* e.g., <DirectionsIcon className="h-6 w-6 text-blue-500 ml-3 cursor-pointer" onClick={() => setIsFormExpanded(true)} /> */}
-        </div>
-      ) : (
-        // Expanded Form Content
-        <>
-          {isSaved ? (
-            // Saved State UI
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="text-center">
-                <h3 className="text-2xl font-semibold text-green-600">🎉 Success!</h3>
-                <p className="text-gray-600 mt-2">Your route "{routeName || 'Unnamed Route'}" has been saved.</p>
+    <div className={cn(
+      "fixed inset-0 z-50 pointer-events-none"
+    )}>
+      {/* Responsive Floating Container */}
+      <div className={cn(
+        "absolute pointer-events-auto",
+        // Mobile positioning (full width with margins)
+        "top-4 left-4 right-4",
+        "w-auto max-w-none",
+        // Tablet positioning
+        "sm:top-6 sm:left-6 sm:right-auto sm:w-full sm:max-w-md",
+        // Desktop positioning (avoid sidebar overlap)
+        "lg:left-24 lg:max-w-lg",
+        "bg-white rounded-lg shadow-xl border border-gray-200/50",
+        "transform transition-all duration-300 ease-out",
+        isFormExpanded 
+          ? "translate-y-0 opacity-100 scale-100" 
+          : "translate-y-0 opacity-100 scale-100"
+      )}>
+        {/* Expanded Header with Close Button */}
+        {isFormExpanded && (
+          <div className="flex items-center justify-between p-4 border-b border-gray-100/50">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-bold">🗺️</span>
               </div>
-              
-              {/* Photo Upload Section */}
-              <div className="mt-6">
-                <h4 className="text-lg font-semibold mb-2">Add Photos to Your Journey</h4>
+              <h2 className="text-lg font-semibold text-gray-800">
+                {isSaved ? "Journey Saved" : "Plan Your Route"}
+              </h2>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleCollapseModal}
+              className="w-8 h-8 rounded-full hover:bg-gray-100/50 transition-colors"
+            >
+              ✕
+            </Button>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="max-h-[calc(100vh-16rem)] sm:max-h-[calc(100vh-12rem)] lg:max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar">
+          {!isFormExpanded ? (
+            // Initial state - only origin input visible with floating style
+            <div className="p-4">
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-green-500 rounded-full border-white shadow-sm z-10"></div>
                 <input
-                  type="file"
-                  multiple
-                  onChange={handlePhotoSelect}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  id="origin-initial"
+                  type="text"
+                  ref={originInputRef}
+                  value={originInputValue}
+                  onChange={(e) => {
+                    setOriginInputValue(e.target.value);
+                  }}
+                  onFocus={() => {
+                    if (!isFormExpanded) {
+                      setIsFormExpanded(true);
+                    }
+                  }}
+                  className="w-full pl-11 pr-4 py-3.5 text-sm sm:text-base border border-gray-200 rounded-full bg-white shadow-sm hover:shadow-md focus:shadow-lg focus:border-blue-500 focus:ring-0 transition-all duration-200 placeholder:text-gray-500"
+                  placeholder="Where do you want to start your journey?"
                 />
-                {previewUrls.length > 0 && (
-                  <div className="mt-4 grid grid-cols-3 gap-4">
-                    {previewUrls.map((url, index) => (
-                      <div key={index} className="relative">
-                        <img src={url} alt={`Preview ${index}`} className="rounded-md object-cover h-24 w-full" />
-                        <Button 
-                          variant="destructive" 
-                          size="icon" 
-                          className="absolute top-1 right-1 h-6 w-6" 
-                          onClick={() => removePhoto(index)}
-                        >
-                          &times;
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8 flex flex-col space-y-3">
-                <Button onClick={finalizeJourney} className="bg-green-500 hover:bg-green-600">
-                  Finalize Journey & Upload Photos
-                </Button>
-                <Button variant="outline" onClick={() => { setIsSaved(false); /* Don't reset isFormExpanded here */ }}>
-                  Edit Route
-                </Button>
               </div>
             </div>
           ) : (
-            // Planning State UI
-            <>
-              <div className="p-6 space-y-4 overflow-y-auto flex-grow">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-1" htmlFor="routeName">Route Name (Optional)</label>
-                  <input
-                    id="routeName"
-                    type="text"
-                    value={routeName}
-                    onChange={(e) => setRouteName(e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="e.g., Summer Road Trip"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-1" htmlFor="origin">Origin</label>
-                  <input
-                    id="origin" // Different ID from the initial search input
-                    type="text"
-                    ref={originInputRef} // Ref will point to this input when expanded
-                    value={origin}
-                    onChange={(e) => setOrigin(e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="Enter origin"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-1" htmlFor="destination">Destination</label>
-                  <input
-                    id="destination"
-                    type="text"
-                    ref={destinationInputRef}
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="Enter destination"
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <h3 className="text-md font-semibold mb-2">Stops (Optional)</h3>
-                  {stops.map((stop, index) => (
-                    <div key={stop.id} className="flex items-center mb-2">
+            <div className="p-4 space-y-5">
+              {isSaved ? (
+                <div className="text-center space-y-4 py-2">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full mx-auto flex items-center justify-center mb-3">
+                    <span className="text-white text-xl">✅</span>
+                  </div>
+                  <p className="text-gray-700 text-base font-medium">
+                    Route "{routeName || 'Unnamed Route'}" saved!
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    Add photos or start planning your next route
+                  </p>
+                  
+                  <div className="space-y-3">
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                        📸 Add photos from your journey (optional)
+                      </label>
                       <input
-                        type="text"
-                        ref={el => stopInputRefs.current[index] = el}
-                        value={stop.name}
-                        onChange={(e) => handleStopInputChange(stop.id, e.target.value)}
-                        className="w-full border rounded px-3 py-2 mr-2"
-                        placeholder={`Stop ${index + 1}`}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handlePhotoSelect}
+                        className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-medium file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 transition-colors"
                       />
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleRemoveStop(stop.id)}
-                      >
-                        Remove
-                      </Button>
                     </div>
-                  ))}
-                  <Button
-                    onClick={handleAddStop}
-                    variant="outline"
-                    className="mt-2 w-full"
-                  >
-                    Add Stop
-                  </Button>
+                    
+                    {previewUrls.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {previewUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img 
+                              src={url} 
+                              alt={`Preview ${index}`} 
+                              className="w-full h-12 object-cover rounded group-hover:shadow-md transition-shadow" 
+                            />
+                            <button
+                              onClick={() => removePhoto(index)}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs shadow-lg hover:bg-red-600 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+                    <Button 
+                      onClick={finalizeJourney} 
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      ✅ Complete Journey
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleResetForNewRoute}
+                      className="border-2 border-primary/20 hover:border-primary/40 text-primary hover:bg-primary/5 px-4 py-2 text-sm rounded-lg transition-all duration-200"
+                    >
+                      🗺️ Plan New Route
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              {/* Footer Actions (only in planning mode and when form is expanded) */}
-              <div className="p-4 border-t flex justify-end space-x-3">
-                <Button variant="outline" onClick={handlePreview} disabled={!origin.trim() || !destination.trim()}>
-                  Preview Route
-                </Button>
-                <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700" disabled={!origin.trim() || !destination.trim()}>
-                  Save Route
-                </Button>
-              </div>
-            </>
+              ) : (
+                // Expanded form with floating style inputs
+                <div className="space-y-4">
+                  {/* Route Name */}
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🏷️ Route Name
+                    </label>
+                    <input
+                      id="routeName"
+                      type="text"
+                      value={routeName}
+                      onChange={(e) => {
+                        const newRouteName = e.target.value;
+                        dispatch(setRouteName(newRouteName));
+                      }}
+                      className="w-full px-4 py-3 text-sm sm:text-base border-2 border-gray-200/50 rounded-xl bg-white/80 backdrop-blur-sm focus:border-primary focus:ring-0 transition-all duration-200 placeholder:text-gray-400"
+                      placeholder="Give your route a memorable name..."
+                    />
+                  </div>
+
+                  {/* Origin Input */}
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      📍 Starting Point
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+                      <input
+                        id="origin"
+                        type="text"
+                        ref={originInputRef}
+                        value={originInputValue}
+                        onChange={(e) => setOriginInputValue(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 text-sm sm:text-base border-2 border-gray-200/50 rounded-xl bg-white/80 backdrop-blur-sm focus:border-primary focus:ring-0 transition-all duration-200 placeholder:text-gray-400"
+                        placeholder="Enter your starting location"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Destination Input */}
+                  <div className="relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      🎯 Destination
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-sm"></div>
+                      <input
+                        id="destination"
+                        type="text"
+                        ref={destinationInputRef}
+                        value={destinationInputValue}
+                        onChange={(e) => setDestinationInputValue(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 text-sm sm:text-base border-2 border-gray-200/50 rounded-xl bg-white/80 backdrop-blur-sm focus:border-primary focus:ring-0 transition-all duration-200 placeholder:text-gray-400"
+                        placeholder="Where are you heading?"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Stops Section */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      🛑 Stops (Optional)
+                    </label>
+                    {stops.map((stop, index) => (
+                      <div key={stop.id} className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm"></div>
+                          <input
+                            type="text"
+                            value={stop.name}
+                            ref={el => stopInputRefs.current[index] = el}
+                            onChange={(e) => handleStopInputChange(stop.id, e.target.value)}
+                            className="w-full pl-9 pr-4 py-2.5 text-sm border-2 border-gray-200/50 rounded-lg bg-white/80 backdrop-blur-sm focus:border-primary focus:ring-0 transition-all duration-200 placeholder:text-gray-400"
+                            placeholder={`Stop ${index + 1}`}
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRemoveStop(stop.id)}
+                          className="w-8 h-8 p-0 rounded-lg border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-all duration-200"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddStop}
+                      className="w-full border-2 border-dashed border-gray-300 hover:border-gray-400 text-gray-600 hover:text-gray-700 rounded-lg py-2.5 transition-all duration-200"
+                    >
+                      ➕ Add Stop
+                    </Button>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={handlePreview} 
+                      disabled={!origin || !destination}
+                      className="flex-1 border-2 border-gray-200 hover:border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm sm:text-base transition-all duration-200 disabled:opacity-50"
+                    >
+                      👁️ Preview Route
+                    </Button>
+                    <Button 
+                      onClick={handleSave} 
+                      disabled={!origin || !destination}
+                      className="flex-1 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white rounded-xl py-2.5 text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
+                    >
+                      💾 Save Route
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </>
-      )}
+        </div>
+      </div>
     </div>
-  )
+  );
 }
