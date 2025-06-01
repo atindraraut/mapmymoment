@@ -20,6 +20,10 @@ interface RouteState {
   origin: Place | null;
   destination: Place | null;
   stops: Stop[];
+  routeInfo: {
+    distance: string;
+    duration: string;
+  } | null;
 }
 
 const initialState: RouteState = {
@@ -27,6 +31,7 @@ const initialState: RouteState = {
   origin: null,
   destination: null,
   stops: [],
+  routeInfo: null,
 };
 
 const routeSlice = createSlice({
@@ -57,6 +62,10 @@ const routeSlice = createSlice({
       console.log('Redux: removeStop called with:', action.payload);
       state.stops = state.stops.filter(stop => stop.id !== action.payload);
     },
+    setRouteInfo(state, action: PayloadAction<{ distance: string; duration: string } | null>) {
+      console.log('Redux: setRouteInfo called with:', action.payload);
+      state.routeInfo = action.payload;
+    },
   },
 });
 
@@ -67,6 +76,7 @@ export const {
   setStops,
   addStop,
   removeStop,
+  setRouteInfo,
 } = routeSlice.actions;
 
 export default routeSlice.reducer;

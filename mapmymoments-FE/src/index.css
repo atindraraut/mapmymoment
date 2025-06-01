@@ -209,6 +209,13 @@ body {
     height: 100%;
     -webkit-overflow-scrolling: touch;
   }
+  
+  /* Ensure map interactions work properly */
+  .gm-style, 
+  .gm-style div, 
+  .gm-style-iw {
+    touch-action: manipulation !important;
+  }
 }
 
 /* Install button styles */
@@ -242,25 +249,19 @@ body {
   }
 }
 
-/* Floating Modal Custom Scrollbar */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+/* Global styles for Google Maps interaction fixes */
+.gm-style {
+  touch-action: manipulation !important;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+.gm-style div {
+  touch-action: inherit !important;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.8);
+/* Ensure map container allows all interactions */
+[data-testid="map"] {
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
 }

@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Provider } from 'react-redux';
+import { Provider, useSelector } from 'react-redux';
 import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 
 import { useAuthGuard } from '@/hooks/useAuthGuard';
-import store from '@/store';
+import store, { RootState } from '@/store';
 import { cn } from '@/lib/utils';
 
 import MapSidebar from '@/components/MapSidebar';
 import UserAvatar from '@/components/UserAvatar';
-import PlanModal from '@/components/NewPlanModal';
+import NewPlanModal from '@/components/NewPlanModal';
+import RouteDisplay from '@/components/RouteDisplay';
+import ReduxDebugger from '@/components/ReduxDebugger';
+import { useRouteActions } from '@/hooks/useRouteActions';
 
 interface RoutePoint {
   origin: string;
@@ -51,54 +54,144 @@ const Application = () => {
 
   return (
     <Provider store={store}>
-      <div className="min-h-screen w-full">
-        <APIProvider apiKey={"AIzaSyDPRWyEVasy7zo_MvEU67Ijwrv4af1R-7E"}>
-          <div className="relative">
-            <Map
-              defaultCenter={{ lat: 12.9716, lng: 77.5946 }}
-              defaultZoom={12}
-              gestureHandling={'greedy'}
-              disableDefaultUI={true}
-              className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
-            >
-              {routePreview?.stops.map((stop) => (
-                <Marker
-                  key={stop.id}
-                  position={{ lat: stop.lat, lng: stop.lng }}
-                />
-              ))}
-            </Map>
-            <MapSidebar 
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
+      <ApplicationContent
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        routePreview={routePreview}
+        isProfileOpen={isProfileOpen}
+        setIsProfileOpen={setIsProfileOpen}
+        userData={userData}
+        handleLogout={handleLogout}
+        handlePreviewRoute={handlePreviewRoute}
+      />
+    </Provider>
+  );
+};
+
+interface ApplicationContentProps {
+  activeTab: 'plan' | 'route';
+  setActiveTab: (tab: 'plan' | 'route') => void;
+  routePreview: RoutePoint | null;
+  isProfileOpen: boolean;
+  setIsProfileOpen: (open: boolean) => void;
+  userData: { firstName: string; lastName: string; email: string };
+  handleLogout: () => void;
+  handlePreviewRoute: (points: RoutePoint) => void;
+}
+
+const ApplicationContent: React.FC<ApplicationContentProps> = ({
+  activeTab,
+  setActiveTab,
+  routePreview,
+  isProfileOpen,
+  setIsProfileOpen,
+  userData,
+  handleLogout,
+  handlePreviewRoute,
+}) => {
+  const routeData = useSelector((state: RootState) => state.route);
+  const { loadRouteData } = useRouteActions();
+
+  // Sample data for testing - you can remove this later
+  const sampleRouteData = {
+    route: {
+      routeName: '',
+      origin: {
+        id: 'wp-1748707912036-0p98gc40v',
+        lat: 12.9304278,
+        lng: 77.678404,
+        name: 'Bellandur',
+        address: 'Bellandur, Bengaluru, Karnataka, India'
+      },
+      destination: {
+        id: 'wp-1748707915420-bspatpatt',
+        lat: 12.9137634,
+        lng: 77.63727779999999,
+        name: 'Hsr Bda Complex',
+        address: 'Hsr Bda Complex, 12th Main Rd, Sector 6, HSR Layout, Bengaluru, Karnataka 560102, India'
+      },
+      stops: [
+        {
+          id: '1748707916280',
+          name: 'Anand Sweets & Savories',
+          lat: 12.9167105,
+          lng: 77.6733224
+        }
+      ]
+    }
+  };
+
+  // Load sample data on component mount - remove this in production
+  useEffect(() => {
+    if (!routeData.origin && !routeData.destination) {
+      loadRouteData(sampleRouteData);
+    }
+  }, []);
+
+  return (
+    <div className="min-h-screen w-full">
+      <APIProvider apiKey={"AIzaSyDPRWyEVasy7zo_MvEU67Ijwrv4af1R-7E"}>
+        <div className="relative" style={{ touchAction: 'auto' }}>
+          <Map
+            defaultCenter={{ lat: 12.9716, lng: 77.5946 }}
+            defaultZoom={12}
+            gestureHandling={'greedy'}
+            disableDefaultUI={true}
+            scrollwheel={true}
+            draggable={true}
+            panControl={true}
+            rotateControl={true}
+            scaleControl={true}
+            streetViewControl={false}
+            zoomControl={true}
+            keyboardShortcuts={true}
+            className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
+            style={{ touchAction: 'auto' }}
+          >
+            {/* Display route from Redux */}
+            <RouteDisplay />
+            
+            {/* Legacy route preview markers */}
+            {routePreview?.stops.map((stop) => (
+              <Marker
+                key={stop.id}
+                position={{ lat: stop.lat, lng: stop.lng }}
+              />
+            ))}
+          </Map>
+          <MapSidebar 
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            firstName={userData.firstName}
+            lastName={userData.lastName}
+            email={userData.email}
+            onLogout={handleLogout}
+            isProfileOpen={isProfileOpen}
+            onProfileToggle={setIsProfileOpen}
+          />
+          <NewPlanModal 
+            isOpen={activeTab === 'plan' && !isProfileOpen} 
+            onPreviewRoute={handlePreviewRoute}
+            onClose={() => setActiveTab('route')}
+          />
+          <div className={cn(
+            "absolute z-50",
+            // Hide on mobile, show on desktop at top-right
+            "hidden lg:block lg:top-4 lg:right-4"
+          )}>
+            <UserAvatar
               firstName={userData.firstName}
               lastName={userData.lastName}
               email={userData.email}
               onLogout={handleLogout}
-              isProfileOpen={isProfileOpen}
-              onProfileToggle={setIsProfileOpen}
             />
-            <PlanModal 
-              isOpen={activeTab === 'plan' && !isProfileOpen} 
-              onPreviewRoute={handlePreviewRoute}
-              onClose={() => setActiveTab('route')}
-            />
-            <div className={cn(
-              "absolute z-50",
-              // Hide on mobile, show on desktop at top-right
-              "hidden lg:block lg:top-4 lg:right-4"
-            )}>
-              <UserAvatar
-                firstName={userData.firstName}
-                lastName={userData.lastName}
-                email={userData.email}
-                onLogout={handleLogout}
-              />
-            </div>
           </div>
-        </APIProvider>
-      </div>
-    </Provider>
+          {/* Route Summary removed - markers are self-explanatory */}
+          {/* Redux Debugger for testing */}
+          {/* <ReduxDebugger /> */}
+        </div>
+      </APIProvider>
+    </div>
   );
 };
 
