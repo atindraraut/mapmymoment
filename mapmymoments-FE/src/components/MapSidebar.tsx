@@ -17,6 +17,17 @@ interface MapSidebarProps {
 
 const MapSidebar = ({ activeTab, onTabChange, firstName = '', lastName = '', email = '', onLogout, isProfileOpen, onProfileToggle }: MapSidebarProps) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '?';
+  
+  // Function to handle tab changes and ensure profile is closed
+  const handleTabWithProfileClose = (tab: 'plan' | 'route') => {
+    // Close the profile if it's open
+    if (isProfileOpen) {
+      onProfileToggle(false);
+    }
+    // Change the tab
+    onTabChange(tab);
+  };
+
   return (
     <nav className={cn(
       "fixed z-50 bg-white shadow-lg transition-all duration-300",
@@ -31,61 +42,77 @@ const MapSidebar = ({ activeTab, onTabChange, firstName = '', lastName = '', ema
         "px-4 justify-around lg:px-0"
       )}>
         <button
-          onClick={() => onTabChange('plan')}
+          onClick={() => handleTabWithProfileClose('plan')}
           className={cn(
             "flex flex-col items-center justify-center w-20 py-1",
-            "transition-colors duration-200",
-            activeTab === 'plan'
-              ? "text-primary"
-              : "text-gray-600 hover:text-primary"
+            "transition-all duration-200",
+            !isProfileOpen && activeTab === 'plan'
+              ? "text-primary font-medium relative bg-primary/10 rounded-lg"
+              : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg"
           )}
         >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          <span className="text-xs mt-1">Plan</span>
+          <div className={cn(
+            "relative flex items-center justify-center",
+            !isProfileOpen && activeTab === 'plan' && "after:absolute after:bottom-[-8px] after:w-10 after:h-1 after:bg-primary after:rounded-full"
+          )}>
+            <svg
+              className="w-6 h-6"
+              fill={!isProfileOpen && activeTab === 'plan' ? "currentColor" : "none"}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={!isProfileOpen && activeTab === 'plan' ? 1.5 : 2}
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={!isProfileOpen && activeTab === 'plan' ? 1.5 : 2}
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </div>
+          <span className={cn(
+            "text-xs mt-2",
+            !isProfileOpen && activeTab === 'plan' ? "font-medium" : ""
+          )}>Plan</span>
         </button>
 
         <button
-          onClick={() => onTabChange('route')}
+          onClick={() => handleTabWithProfileClose('route')}
           className={cn(
             "flex flex-col items-center justify-center w-20 py-1",
-            "transition-colors duration-200",
-            activeTab === 'route'
-              ? "text-primary"
-              : "text-gray-600 hover:text-primary"
+            "transition-all duration-200", 
+            !isProfileOpen && activeTab === 'route'
+              ? "text-primary font-medium relative bg-primary/10 rounded-lg"
+              : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg"
           )}
         >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-            />
-          </svg>
-          <span className="text-xs mt-1">Route</span>
+          <div className={cn(
+            "relative flex items-center justify-center",
+            !isProfileOpen && activeTab === 'route' && "after:absolute after:bottom-[-8px] after:w-10 after:h-1 after:bg-primary after:rounded-full"
+          )}>
+            <svg
+              className="w-6 h-6"
+              fill={!isProfileOpen && activeTab === 'route' ? "currentColor" : "none"}
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={!isProfileOpen && activeTab === 'route' ? 1.5 : 2}
+                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+              />
+            </svg>
+          </div>
+          <span className={cn(
+            "text-xs mt-2",
+            !isProfileOpen && activeTab === 'route' ? "font-medium" : ""
+          )}>Route</span>
         </button>
 
         {/* Profile Button - Only visible on mobile */}
@@ -93,15 +120,20 @@ const MapSidebar = ({ activeTab, onTabChange, firstName = '', lastName = '', ema
           onClick={() => onProfileToggle(!isProfileOpen)}
           className={cn(
             "flex flex-col items-center justify-center w-20 py-1",
-            "transition-colors duration-200",
-            "text-gray-600 hover:text-primary",
+            "transition-all duration-200",
+            isProfileOpen
+              ? "text-primary font-medium relative bg-primary/10 rounded-lg"
+              : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg",
             "lg:hidden" // Hide on desktop
           )}
         >
           <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-medium">
             {initials}
           </div>
-          <span className="text-xs mt-1">Profile</span>
+          <span className={cn(
+            "text-xs mt-2",
+            isProfileOpen ? "font-medium" : ""
+          )}>Profile</span>
         </button>
       </div>
 

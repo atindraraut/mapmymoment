@@ -52,11 +52,20 @@ const Application = () => {
     // TODO: Draw route line between points using Google Maps Directions service
   };
 
+  // Update to handle tab changes more consistently with profile state
+  const handleTabChange = (tab: 'plan' | 'route') => {
+    setActiveTab(tab);
+    // If changing to plan tab, ensure the profile is closed
+    if (tab === 'plan' && isProfileOpen) {
+      setIsProfileOpen(false);
+    }
+  };
+
   return (
     <Provider store={store}>
       <ApplicationContent
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         routePreview={routePreview}
         isProfileOpen={isProfileOpen}
         setIsProfileOpen={setIsProfileOpen}
@@ -90,43 +99,7 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
   handlePreviewRoute,
 }) => {
   const routeData = useSelector((state: RootState) => state.route);
-  const { loadRouteData } = useRouteActions();
 
-  // Sample data for testing - you can remove this later
-  const sampleRouteData = {
-    route: {
-      routeName: '',
-      origin: {
-        id: 'wp-1748707912036-0p98gc40v',
-        lat: 12.9304278,
-        lng: 77.678404,
-        name: 'Bellandur',
-        address: 'Bellandur, Bengaluru, Karnataka, India'
-      },
-      destination: {
-        id: 'wp-1748707915420-bspatpatt',
-        lat: 12.9137634,
-        lng: 77.63727779999999,
-        name: 'Hsr Bda Complex',
-        address: 'Hsr Bda Complex, 12th Main Rd, Sector 6, HSR Layout, Bengaluru, Karnataka 560102, India'
-      },
-      stops: [
-        {
-          id: '1748707916280',
-          name: 'Anand Sweets & Savories',
-          lat: 12.9167105,
-          lng: 77.6733224
-        }
-      ]
-    }
-  };
-
-  // Load sample data on component mount - remove this in production
-  useEffect(() => {
-    if (!routeData.origin && !routeData.destination) {
-      loadRouteData(sampleRouteData);
-    }
-  }, []);
 
   return (
     <div className="min-h-screen w-full">
@@ -186,9 +159,6 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
               onLogout={handleLogout}
             />
           </div>
-          {/* Route Summary removed - markers are self-explanatory */}
-          {/* Redux Debugger for testing */}
-          {/* <ReduxDebugger /> */}
         </div>
       </APIProvider>
     </div>

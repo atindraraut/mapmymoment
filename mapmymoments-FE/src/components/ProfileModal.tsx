@@ -43,22 +43,25 @@ const ProfileModal = ({
     console.log('Navigate to edit profile');
   };
 
+  // Handle click outside to close the modal
+  const handleBackgroundClick = (e: React.MouseEvent) => {
+    // Only close if clicking on the background, not the modal content
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+  
   return (
     <div className="lg:hidden">
-      {/* Full Screen Modal - Positioned above sidebar but below other modals */}
-      <div className="fixed top-0 left-0 right-0 bottom-16 z-40 bg-white flex flex-col">
+      {/* Full Screen Modal with backdrop - Positioned above sidebar but below other modals */}
+      <div 
+        className="fixed top-0 left-0 right-0 bottom-16 z-40 bg-white flex flex-col"
+        onClick={handleBackgroundClick}
+      >
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary to-accent px-4 py-6 text-white">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-r from-primary to-accent px-4 py-6 text-white relative">
+          <div className="flex items-center">
             <h2 className="text-xl font-semibold">Profile</h2>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
         </div>
 

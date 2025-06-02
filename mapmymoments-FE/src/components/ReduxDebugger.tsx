@@ -26,33 +26,6 @@ export default function ReduxDebugger() {
     }));
   };
 
-  const loadSampleRoute = () => {
-    console.log('Loading sample route...');
-    dispatch(setRouteName('Bellandur to HSR Layout'));
-    dispatch(setOrigin({
-      id: 'wp-1748707912036-0p98gc40v',
-      lat: 12.9304278,
-      lng: 77.678404,
-      name: 'Bellandur',
-      address: 'Bellandur, Bengaluru, Karnataka, India'
-    }));
-    dispatch(setDestination({
-      id: 'wp-1748707915420-bspatpatt',
-      lat: 12.9137634,
-      lng: 77.63727779999999,
-      name: 'Hsr Bda Complex',
-      address: 'Hsr Bda Complex, 12th Main Rd, Sector 6, HSR Layout, Bengaluru, Karnataka 560102, India'
-    }));
-    dispatch(setStops([
-      {
-        id: '1748707916280',
-        name: 'Anand Sweets & Savories',
-        lat: 12.9167105,
-        lng: 77.6733224
-      }
-    ]));
-  };
-
   return (
     <div style={{ 
       position: 'fixed', 
@@ -81,20 +54,6 @@ export default function ReduxDebugger() {
           }}
         >
           Test Redux
-        </button>
-        <button 
-          onClick={loadSampleRoute}
-          style={{ 
-            marginBottom: '5px', 
-            padding: '5px 10px', 
-            backgroundColor: '#28a745', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '3px',
-            cursor: 'pointer'
-          }}
-        >
-          Load Sample Route
         </button>
       </div>
       <pre style={{ fontSize: '10px', overflow: 'auto', maxHeight: '200px' }}>

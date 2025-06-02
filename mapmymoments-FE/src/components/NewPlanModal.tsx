@@ -1,3 +1,13 @@
+/**
+ * NewPlanModal Component
+ * 
+ * This component provides a modal interface for planning and saving routes:
+ * - Search for origins, destinations, and stops using Google Places API
+ * - Preview routes on a map
+ * - Save routes to the backend
+ * - Upload photos associated with the route
+ */
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -55,10 +65,14 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   const stopInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [lastAddedStopId, setLastAddedStopId] = useState<string | null>(null);
 
+  // Add state for saving route and route ID
   const [isSaved, setIsSaved] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isFormExpanded, setIsFormExpanded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [savedRouteId, setSavedRouteId] = useState<string | null>(null);
 
   const placesLib = useMapsLibrary('places');
 
@@ -220,13 +234,82 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     toast({ title: "Previewing Route", description: "Showing the route on the map." });
   };
 
-  const handleSave = () => {
-    setIsSaved(true);
+  const handleSave = async () => {
+    if (!origin || !destination) {
+      toast({
+        title: "❌ Cannot Save Route",
+        description: "Please set both origin and destination.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    // Show loading toast
     toast({
-      title: "🎉 Route Saved Successfully!",
-      description: "Your route has been saved. Add photos or plan another route.",
+      title: "📍 Saving Route...",
+      description: "Please wait while we save your journey.",
     });
-    console.log("Route saved:", { routeName, origin, destination, stops });
+    
+    try {
+      // Import the saveRoute function
+      const { saveRoute } = await import('@/lib/api');
+      
+      // Format data for API
+      const routeData = {
+        name: routeName || `Journey ${new Date().toLocaleDateString()}`,
+        origin: {
+          id: origin.id,
+          lat: origin.lat,
+          lng: origin.lng,
+          name: origin.name,
+          address: origin.address || origin.name
+        },
+        destination: {
+          id: destination.id,
+          lat: destination.lat,
+          lng: destination.lng,
+          name: destination.name,
+          address: destination.address || destination.name
+        },
+        intermediateWaypoints: stops.map(stop => ({
+          id: stop.id,
+          lat: stop.lat,
+          lng: stop.lng,
+          name: stop.name,
+          address: stop.name // Using name as address since we don't have separate address
+        }))
+      };
+      
+      // Call API to save route
+      const result = await saveRoute(routeData);
+      
+      if (result.success) {
+        setIsSaved(true);
+        setSavedRouteId(result.data?.id || null);
+        toast({
+          title: "🎉 Route Saved Successfully!",
+          description: "Your route has been saved. Add photos or plan another route.",
+        });
+        console.log("Route saved with ID:", result.data?.id);
+      } else {
+        toast({
+          title: "❌ Error Saving Route",
+          description: result.error || "Something went wrong. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error during route save:", error);
+      toast({
+        title: "❌ Error Saving Route",
+        description: "There was an issue connecting to the server.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleResetForNewRoute = () => {
@@ -273,9 +356,49 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     };
   }, [previewUrls]);
 
-  const finalizeJourney = () => {
-    if (selectedPhotos.length > 0) {
-      toast({ title: "Journey Complete! 🎉", description: "Your photos are being uploaded." });
+  const finalizeJourney = async () => {
+    if (selectedPhotos.length > 0 && savedRouteId) {
+      setIsUploading(true);
+      
+      try {
+        // Show loading toast
+        toast({ 
+          title: "📸 Uploading Photos...", 
+          description: "Please wait while we upload your photos." 
+        });
+        
+        const { uploadRoutePhotos } = await import('@/lib/api');
+        const result = await uploadRoutePhotos(savedRouteId, selectedPhotos);
+        
+        if (result.success) {
+          toast({ 
+            title: "✅ Photos Uploaded!", 
+            description: "Your journey photos have been saved." 
+          });
+        } else {
+          toast({
+            title: "❌ Photo Upload Failed",
+            description: result.error || "There was an issue uploading your photos.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Error uploading photos:', error);
+        toast({
+          title: "❌ Photo Upload Error",
+          description: "There was a problem uploading your photos.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      toast({ 
+        title: "Journey Complete! 🎉", 
+        description: selectedPhotos.length === 0 
+          ? "Your route has been saved without photos." 
+          : "No route ID found to upload photos to." 
+      });
     }
     
     // Clean up photo URLs
@@ -307,14 +430,24 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   };
 
   const handleCloseAndReset = () => {
+    // Reset Redux state
     dispatch(setRouteName(''));
     dispatch(setOrigin(null));
     dispatch(setDestination(null));
     dispatch(setStops([]));
+    
+    // Reset local state
     setIsSaved(false);
     setSelectedPhotos([]);
     setPreviewUrls([]);
+    setSavedRouteId(null);
+    setIsSaving(false);
+    setIsUploading(false);
+    
+    // Clean up resources
     previewUrls.forEach(url => URL.revokeObjectURL(url));
+    
+    // Close the modal
     onClose();
   };
 
@@ -447,9 +580,10 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
                   <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
                     <Button 
                       onClick={finalizeJourney} 
-                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                      disabled={isUploading}
+                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 text-sm rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-70"
                     >
-                      ✅ Complete Journey
+                      {isUploading ? '⏳ Uploading Photos...' : '✅ Complete Journey'}
                     </Button>
                     <Button 
                       variant="outline" 
@@ -569,10 +703,10 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
                     </Button>
                     <Button 
                       onClick={handleSave} 
-                      disabled={!origin || !destination}
+                      disabled={!origin || !destination || isSaving}
                       className="flex-1 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white rounded-xl py-2.5 text-sm sm:text-base shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
                     >
-                      💾 Save Route
+                      {isSaving ? '⏳ Saving...' : '💾 Save Route'}
                     </Button>
                   </div>
                 </div>
