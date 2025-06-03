@@ -2,9 +2,16 @@ import React from 'react';
 import { cn } from "@/lib/utils";
 import ProfileModal from './ProfileModal';
 
+export interface SidebarTabConfig {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
 interface MapSidebarProps {
-  activeTab: 'plan' | 'route';
-  onTabChange: (tab: 'plan' | 'route') => void;
+  tabs: SidebarTabConfig[];
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   // User data for mobile profile
   firstName?: string;
   lastName?: string;
@@ -15,16 +22,14 @@ interface MapSidebarProps {
   onProfileToggle: (isOpen: boolean) => void;
 }
 
-const MapSidebar = ({ activeTab, onTabChange, firstName = '', lastName = '', email = '', onLogout, isProfileOpen, onProfileToggle }: MapSidebarProps) => {
+const MapSidebar = ({ tabs, activeTab, onTabChange, firstName = '', lastName = '', email = '', onLogout, isProfileOpen, onProfileToggle }: MapSidebarProps) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '?';
-  
+
   // Function to handle tab changes and ensure profile is closed
-  const handleTabWithProfileClose = (tab: 'plan' | 'route') => {
-    // Close the profile if it's open
+  const handleTabWithProfileClose = (tab: string) => {
     if (isProfileOpen) {
       onProfileToggle(false);
     }
-    // Change the tab
     onTabChange(tab);
   };
 
@@ -41,79 +46,30 @@ const MapSidebar = ({ activeTab, onTabChange, firstName = '', lastName = '', ema
         "lg:flex-col lg:items-center lg:justify-start lg:pt-4",
         "px-4 justify-around lg:px-0"
       )}>
-        <button
-          onClick={() => handleTabWithProfileClose('plan')}
-          className={cn(
-            "flex flex-col items-center justify-center w-20 py-1",
-            "transition-all duration-200",
-            !isProfileOpen && activeTab === 'plan'
-              ? "text-primary font-medium relative bg-primary/10 rounded-lg"
-              : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg"
-          )}
-        >
-          <div className={cn(
-            "relative flex items-center justify-center",
-            !isProfileOpen && activeTab === 'plan' && "after:absolute after:bottom-[-8px] after:w-10 after:h-1 after:bg-primary after:rounded-full"
-          )}>
-            <svg
-              className="w-6 h-6"
-              fill={!isProfileOpen && activeTab === 'plan' ? "currentColor" : "none"}
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={!isProfileOpen && activeTab === 'plan' ? 1.5 : 2}
-                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={!isProfileOpen && activeTab === 'plan' ? 1.5 : 2}
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-          </div>
-          <span className={cn(
-            "text-xs mt-2",
-            !isProfileOpen && activeTab === 'plan' ? "font-medium" : ""
-          )}>Plan</span>
-        </button>
-
-        <button
-          onClick={() => handleTabWithProfileClose('route')}
-          className={cn(
-            "flex flex-col items-center justify-center w-20 py-1",
-            "transition-all duration-200", 
-            !isProfileOpen && activeTab === 'route'
-              ? "text-primary font-medium relative bg-primary/10 rounded-lg"
-              : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg"
-          )}
-        >
-          <div className={cn(
-            "relative flex items-center justify-center",
-            !isProfileOpen && activeTab === 'route' && "after:absolute after:bottom-[-8px] after:w-10 after:h-1 after:bg-primary after:rounded-full"
-          )}>
-            <svg
-              className="w-6 h-6"
-              fill={!isProfileOpen && activeTab === 'route' ? "currentColor" : "none"}
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={!isProfileOpen && activeTab === 'route' ? 1.5 : 2}
-                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-              />
-            </svg>
-          </div>
-          <span className={cn(
-            "text-xs mt-2",
-            !isProfileOpen && activeTab === 'route' ? "font-medium" : ""
-          )}>Route</span>
-        </button>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => handleTabWithProfileClose(tab.key)}
+            className={cn(
+              "flex flex-col items-center justify-center w-20 py-1",
+              "transition-all duration-200",
+              !isProfileOpen && activeTab === tab.key
+                ? "text-primary font-medium relative bg-primary/10 rounded-lg"
+                : "text-gray-600 hover:text-primary hover:bg-gray-100 hover:rounded-lg"
+            )}
+          >
+            <div className={cn(
+              "relative flex items-center justify-center",
+              !isProfileOpen && activeTab === tab.key && "after:absolute after:bottom-[-8px] after:w-10 after:h-1 after:bg-primary after:rounded-full"
+            )}>
+              {tab.icon}
+            </div>
+            <span className={cn(
+              "text-xs mt-2",
+              !isProfileOpen && activeTab === tab.key ? "font-medium" : ""
+            )}>{tab.label}</span>
+          </button>
+        ))}
 
         {/* Profile Button - Only visible on mobile */}
         <button

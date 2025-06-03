@@ -7,7 +7,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import store, { RootState } from '@/store';
 import { cn } from '@/lib/utils';
 
-import MapSidebar from '@/components/MapSidebar';
+import MapSidebar, { SidebarTabConfig } from '@/components/MapSidebar';
 import UserAvatar from '@/components/UserAvatar';
 import NewPlanModal from '@/components/NewPlanModal';
 import RouteDisplay from '@/components/RouteDisplay';
@@ -88,6 +88,29 @@ interface ApplicationContentProps {
   handlePreviewRoute: (points: RoutePoint) => void;
 }
 
+const TAB_CONFIG: SidebarTabConfig[] = [
+  {
+    key: 'plan',
+    label: 'Plan',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'route',
+    label: 'Route',
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+      </svg>
+    ),
+  },
+  // Add more tabs here as needed
+];
+
 const ApplicationContent: React.FC<ApplicationContentProps> = ({
   activeTab,
   setActiveTab,
@@ -100,6 +123,24 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
 }) => {
   const routeData = useSelector((state: RootState) => state.route);
 
+  // Tab content mapping as a function to access latest props
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'plan':
+        return (
+          <NewPlanModal
+            isOpen={activeTab === 'plan' && !isProfileOpen}
+            onPreviewRoute={handlePreviewRoute}
+            onClose={() => setActiveTab('route')}
+          />
+        );
+      case 'route':
+        return <RouteDisplay />;
+      // Add more cases for new tabs
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen w-full">
@@ -122,8 +163,7 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
             style={{ touchAction: 'auto' }}
           >
             {/* Display route from Redux */}
-            <RouteDisplay />
-            
+            {activeTab === 'route' && <RouteDisplay />}
             {/* Legacy route preview markers */}
             {routePreview?.stops.map((stop) => (
               <Marker
@@ -132,7 +172,8 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
               />
             ))}
           </Map>
-          <MapSidebar 
+          <MapSidebar
+            tabs={TAB_CONFIG}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             firstName={userData.firstName}
@@ -142,11 +183,10 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
             isProfileOpen={isProfileOpen}
             onProfileToggle={setIsProfileOpen}
           />
-          <NewPlanModal 
-            isOpen={activeTab === 'plan' && !isProfileOpen} 
-            onPreviewRoute={handlePreviewRoute}
-            onClose={() => setActiveTab('route')}
-          />
+          {/* Render tab content outside sidebar for scalability */}
+          <div className="absolute left-0 right-0 bottom-16 lg:bottom-auto lg:left-20 lg:top-0 lg:right-auto lg:w-[calc(100%-5rem)]">
+            {renderTabContent()}
+          </div>
           <div className={cn(
             "absolute z-50",
             // Hide on mobile, show on desktop at top-right
