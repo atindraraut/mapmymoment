@@ -13,6 +13,7 @@ import NewPlanModal from '@/components/NewPlanModal';
 import RouteDisplay from '@/components/RouteDisplay';
 import ReduxDebugger from '@/components/ReduxDebugger';
 import { useRouteActions } from '@/hooks/useRouteActions';
+import RouteGrid from '@/components/RouteGrid';
 
 interface RoutePoint {
   origin: string;
@@ -135,7 +136,12 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
           />
         );
       case 'route':
-        return <RouteDisplay />;
+        // Full screen grid of all routes
+        return (
+          <div className="fixed inset-0 z-40 bg-white overflow-auto">
+            <RouteGrid />
+          </div>
+        );
       // Add more cases for new tabs
       default:
         return null;
