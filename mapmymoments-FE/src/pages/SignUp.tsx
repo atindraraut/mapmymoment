@@ -68,11 +68,11 @@ const SignUp = () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/user/verify-otp', {
+      const res = await apiFetch('/user/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailForOtp, otp })
-      });
+        body: JSON.stringify({ email: emailForOtp, otp }),
+      },false);
       const data = await res.json();
       if (res.ok) {
         // Store tokens in localStorage
