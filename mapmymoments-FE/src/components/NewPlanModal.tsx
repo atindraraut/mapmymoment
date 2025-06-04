@@ -7,7 +7,7 @@
  * - Save routes to the backend
  * - Upload photos associated with the route
  */
-
+import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -358,30 +358,80 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
 
   const finalizeJourney = async () => {
     if (selectedPhotos.length > 0 && savedRouteId) {
-      setIsUploading(true);
-      
-      try {
-        // Show loading toast
-        toast({ 
-          title: "📸 Uploading Photos...", 
-          description: "Please wait while we upload your photos." 
+      if (selectedPhotos.length > 30) {
+        toast({
+          title: "❌ Too Many Photos",
+          description: "You can upload a maximum of 30 images at once.",
+          variant: "destructive"
         });
-        
-        const { uploadRoutePhotos } = await import('@/lib/api');
-        const result = await uploadRoutePhotos(savedRouteId, selectedPhotos);
-        
-        if (result.success) {
-          toast({ 
-            title: "✅ Photos Uploaded!", 
-            description: "Your journey photos have been saved." 
-          });
-        } else {
+        return;
+      }
+      setIsUploading(true);
+      try {
+        toast({
+          title: "📸 Getting Upload URLs...",
+          description: "Preparing to upload your photos."
+        });
+        const { getS3UploadUrls } = await import('@/lib/api');
+        const filenames = selectedPhotos.map(f => f.name);
+        const contentTypes = selectedPhotos.map(f => f.type || 'application/octet-stream');
+        // Custom fetch to send both filenames and contentTypes
+        const response = await apiFetch(`/api/routes/${savedRouteId}/generate-upload-urls`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filenames, contentTypes })
+        },false);
+        let urlRes;
+        try {
+          urlRes = await response.json();
+        } catch (e) {
           toast({
-            title: "❌ Photo Upload Failed",
-            description: result.error || "There was an issue uploading your photos.",
+            title: "❌ Failed to get upload URLs",
+            description: "Server returned invalid JSON. Please try again.",
             variant: "destructive"
           });
+          setIsUploading(false);
+          return;
         }
+        // Accept both { urls: [...] } and { success, data } shapes
+        let urls = urlRes.data || urlRes.urls;
+        if (!urls || !Array.isArray(urls)) {
+          toast({
+            title: "❌ Failed to get upload URLs",
+            description: urlRes.error || "Could not get S3 signed URLs.",
+            variant: "destructive"
+          });
+          setIsUploading(false);
+          return;
+        }
+        toast({
+          title: "📤 Uploading Photos...",
+          description: `Uploading ${selectedPhotos.length} images to S3.`
+        });
+        // Upload each file to its signed URL
+        for (let i = 0; i < selectedPhotos.length; i++) {
+          const file = selectedPhotos[i];
+          const urlObj = urls.find(u => u.filename === file.name);
+          if (!urlObj) continue;
+          const res = await fetch(urlObj.url, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream'
+            }
+          });
+          if (!res.ok) {
+            toast({
+              title: `❌ Failed to upload ${file.name}`,
+              description: `Could not upload image to S3.`,
+              variant: "destructive"
+            });
+          }
+        }
+        toast({
+          title: "✅ Photos Uploaded!",
+          description: "Your journey photos have been uploaded to S3."
+        });
       } catch (error) {
         console.error('Error uploading photos:', error);
         toast({
@@ -393,17 +443,15 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
         setIsUploading(false);
       }
     } else {
-      toast({ 
-        title: "Journey Complete! 🎉", 
-        description: selectedPhotos.length === 0 
-          ? "Your route has been saved without photos." 
-          : "No route ID found to upload photos to." 
+      toast({
+        title: "Journey Complete! 🎉",
+        description: selectedPhotos.length === 0
+          ? "Your route has been saved without photos."
+          : "No route ID found to upload photos to."
       });
     }
-    
     // Clean up photo URLs
     previewUrls.forEach(url => URL.revokeObjectURL(url));
-    
     // Reset for new route
     handleResetForNewRoute();
   };

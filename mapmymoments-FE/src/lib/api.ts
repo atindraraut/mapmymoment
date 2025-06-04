@@ -241,3 +241,25 @@ export async function uploadRoutePhotos(routeId: string, photos: File[]): Promis
     };
   }
 }
+
+/**
+ * Get S3 signed upload URLs for a route
+ * @param routeId - The route ID (directory)
+ * @param filenames - Array of filenames (max 30)
+ * @returns Array of { filename, url }
+ */
+export async function getS3UploadUrls(routeId: string, filenames: string[]): Promise<ApiResponse<{ filename: string; url: string }[]>> {
+  if (!routeId || !filenames.length || filenames.length > 30) {
+    return { success: false, error: 'Invalid routeId or filenames' };
+  }
+  const response = await apiFetch(`/api/routes/${routeId}/generate-upload-urls`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filenames }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    return { success: false, error: data.error || 'Failed to get upload URLs' };
+  }
+  return { success: true, data: data.urls };
+}
