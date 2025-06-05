@@ -372,7 +372,6 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
           title: "📸 Getting Upload URLs...",
           description: "Preparing to upload your photos."
         });
-        const { getS3UploadUrls } = await import('@/lib/api');
         const filenames = selectedPhotos.map(f => f.name);
         const contentTypes = selectedPhotos.map(f => f.type || 'application/octet-stream');
         // Custom fetch to send both filenames and contentTypes

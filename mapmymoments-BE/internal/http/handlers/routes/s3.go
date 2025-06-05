@@ -54,7 +54,7 @@ func GenerateS3UploadUrlsHandler() http.HandlerFunc {
 		}
 		bucket := os.Getenv("S3_BUCKET")
 		if bucket == "" {
-			bucket = "mapmymoment-images"
+			bucket = "mapmymoment-image"
 		}
 		region := os.Getenv("AWS_REGION")
 		if region == "" {
