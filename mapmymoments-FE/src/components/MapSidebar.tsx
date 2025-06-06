@@ -37,10 +37,14 @@ const MapSidebar = ({ tabs, activeTab, onTabChange, firstName = '', lastName = '
     <nav className={cn(
       "fixed z-50 bg-white shadow-lg transition-all duration-300",
       // Mobile styles
-      "bottom-0 left-0 right-0 h-16",
+      "bottom-0 left-0 right-0",
       // Desktop styles
       "lg:top-0 lg:left-0 lg:h-screen lg:w-20"
-    )}>
+    )}
+    style={{ 
+      paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      height: 'calc(4rem + env(safe-area-inset-bottom, 0px))' // 4rem = 16 in TailwindCSS
+    }}>
       <div className={cn(
         "flex items-center h-full",
         "lg:flex-col lg:items-center lg:justify-start lg:pt-4",

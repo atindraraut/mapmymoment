@@ -468,11 +468,22 @@ const RouteDetails: React.FC = () => {
     [];
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-primary/5 via-white to-accent/10 flex flex-col items-center p-4 sm:p-6 md:p-8">
+    <div 
+      className="min-h-screen w-full bg-gradient-to-br from-primary/5 via-white to-accent/10 flex flex-col items-center p-4 sm:p-6 md:p-8"
+      style={{
+        paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))', 
+        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+        paddingLeft: 'calc(1rem + env(safe-area-inset-left, 0px))',
+        paddingRight: 'calc(1rem + env(safe-area-inset-right, 0px))', 
+        paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))', 
+        paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+        paddingLeft: 'calc(1rem + env(safe-area-inset-left, 0px))',
+        paddingRight: 'calc(1rem + env(safe-area-inset-right, 0px))',
+      }}
       {/* Back button - fixed position for easy access */}
       <button 
         onClick={() => navigate('/app', { state: { tab: 'route' } })}
-        className="fixed top-4 left-4 z-10 flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm text-sm font-medium rounded-full shadow-md hover:bg-white transition-all duration-300 text-primary"
+        className="fixed top-4 left-4 top-safe-4 left-safe-4 z-10 flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm text-sm font-medium rounded-full shadow-md hover:bg-white transition-all duration-300 text-primary"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -486,6 +497,7 @@ const RouteDetails: React.FC = () => {
           className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
           onClick={() => setShowDeleteConfirm(true)}
           title="Delete this Route"
+          style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))', right: 'calc(1rem + env(safe-area-inset-right, 0px))' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -550,7 +562,8 @@ const RouteDetails: React.FC = () => {
         </div>
       )}
 
-      <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto mt-14 sm:mt-16">
+      <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto pt-14 sm:pt-16" 
+           style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
         {/* Main content section - two column on large screens */}
         <div className="lg:flex lg:gap-6 xl:gap-8">
           {/* Left column with route details */}

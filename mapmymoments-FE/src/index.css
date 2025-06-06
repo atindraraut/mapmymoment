@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import './lib/safeareas.css';
 
 @layer base {
   :root {
@@ -198,7 +199,7 @@ body {
   background-color: rgba(156, 163, 175, 0.8);
 }
 
-/* For PWA experience - hide address bar */
+/* For PWA experience - handle mobile devices properly */
 @media screen and (orientation: portrait) {
   html, body {
     height: 100vh;
@@ -208,6 +209,11 @@ body {
     overflow-y: auto;
     height: 100%;
     -webkit-overflow-scrolling: touch;
+    /* Add padding for mobile devices with notches or status bars */
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
   }
   
   /* Ensure map interactions work properly */
@@ -264,4 +270,63 @@ body {
   user-select: none !important;
   -webkit-user-select: none !important;
   -webkit-touch-callout: none !important;
+}
+
+/* Safe area adjustments for all pages */
+.min-h-screen {
+  min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Add top padding for fixed headers */
+.fixed.top-0 {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Add bottom padding for fixed footers */
+.fixed.bottom-0 {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Safe Area Position Classes */
+.top-safe-4 {
+  top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+}
+
+.left-safe-4 {
+  left: calc(1rem + env(safe-area-inset-left, 0px)) !important;
+}
+
+.right-safe-4 {
+  right: calc(1rem + env(safe-area-inset-right, 0px)) !important;
+}
+
+.bottom-safe-4 {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* Fix for modal scrolling on iOS */
+.modal-content {
+  max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 5rem) !important;
+}
+
+/* Fix for absolutely positioned elements */
+body:after {
+  content: '';
+  display: block;
+  position: fixed;
+  top: 0;
+  height: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  background-color: white;
+  z-index: 9999;
+}
+
+/* Fix for notched devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
 }

@@ -1,0 +1,84 @@
+/* Safe areas utility classes */
+
+/* Apply this class to containers that need to respect safe areas */
+.safe-areas {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* For fixed elements at the top of the screen */
+.safe-area-top {
+  top: env(safe-area-inset-top, 0px);
+}
+
+/* For fixed elements at the bottom of the screen */
+.safe-area-bottom {
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Combine with existing position classes */
+.fixed-top-safe {
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+}
+
+.fixed-bottom-safe {
+  position: fixed;
+  bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* For margins */
+.mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* For padding */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Combined classes */
+.safe-top-4 {
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+.safe-bottom-4 {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.safe-left-4 {
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+}
+
+.safe-right-4 {
+  right: calc(1rem + env(safe-area-inset-right, 0px));
+}
+
+/* Content areas */
+.content-safe-area {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+  padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+}
+
+/* Specific fixes for mobile notches/bars */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+  
+  .h-screen {
+    height: -webkit-fill-available;
+  }
+}

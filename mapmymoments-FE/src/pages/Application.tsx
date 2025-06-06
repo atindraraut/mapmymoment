@@ -173,7 +173,11 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
             zoomControl={true}
             keyboardShortcuts={true}
             className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
-            style={{ touchAction: 'auto' }}
+            style={{ 
+              touchAction: 'auto',
+              paddingTop: 'env(safe-area-inset-top, 0px)', 
+              height: 'calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+            }}
           >
             {/* Display route from Redux */}
             {activeTab === 'route' && <RouteDisplay />}

@@ -7,7 +7,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <header className="fixed w-full bg-background/90 backdrop-blur-md z-50 shadow-sm">
+    <header className="fixed w-full bg-background/90 backdrop-blur-md z-50 shadow-sm" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       <div className="container mx-auto flex justify-between items-center py-4">
         <a href="/" className="flex items-center space-x-2">
           <MapPin size={32} className="text-primary" />
