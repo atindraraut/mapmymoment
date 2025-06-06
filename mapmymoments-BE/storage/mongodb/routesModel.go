@@ -1,14 +1,17 @@
 package mongodb
 
 import (
-	context "context"
+	"context"
 	"errors"
+	"fmt"
 	"time"
+
 	"github.com/atindraraut/crudgo/internal/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+const cloudfrontDomain = "https://your-cloudfront-domain.cloudfront.net"
 
 func (m *MongoDB) CreateRoute(route interface{}) (string, error) {
 	ctx := context.Background()
@@ -26,6 +29,16 @@ func (m *MongoDB) CreateRoute(route interface{}) (string, error) {
 	if r.UpdatedAt == 0 {
 		r.UpdatedAt = r.CreatedAt
 	}
+
+	// Ensure `photos` field is included when creating a route
+	if len(r.Photos) > 0 {
+		for i, photo := range r.Photos {
+			if photo.CloudfrontUrl == "" {
+				r.Photos[i].CloudfrontUrl = fmt.Sprintf("%s/%s/%s", cloudfrontDomain, r.ID, photo.Filename)
+			}
+		}
+	}
+
 	_, err := coll.InsertOne(ctx, r)
 	if err != nil {
 		return "", err
@@ -67,33 +80,33 @@ func (m *MongoDB) GetAllRoutes() ([]interface{}, error) {
 }
 
 func (m *MongoDB) UpdateRoute(id string, route interface{}) (string, error) {
-    ctx := context.Background()
-    coll := m.database.Collection("routes")
-    r, ok := route.(types.Route)
-    if !ok {
-        return "", errors.New("invalid route type")
-    }
-    r.UpdatedAt = time.Now().UnixMilli()
+	ctx := context.Background()
+	coll := m.database.Collection("routes")
+	r, ok := route.(types.Route)
+	if !ok {
+		return "", errors.New("invalid route type")
+	}
+	r.UpdatedAt = time.Now().UnixMilli()
 
-    // Convert to bson.M and remove _id
-    updateDoc, err := bson.Marshal(r)
-    if err != nil {
-        return "", err
-    }
-    var updateMap bson.M
-    if err := bson.Unmarshal(updateDoc, &updateMap); err != nil {
-        return "", err
-    }
-    delete(updateMap, "_id")
+	// Convert to bson.M and remove _id
+	updateDoc, err := bson.Marshal(r)
+	if err != nil {
+		return "", err
+	}
+	var updateMap bson.M
+	if err := bson.Unmarshal(updateDoc, &updateMap); err != nil {
+		return "", err
+	}
+	delete(updateMap, "_id")
 
-    res, err := coll.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": updateMap})
-    if err != nil {
-        return "", err
-    }
-    if res.MatchedCount == 0 {
-        return "", errors.New("route not found")
-    }
-    return id, nil
+	res, err := coll.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": updateMap})
+	if err != nil {
+		return "", err
+	}
+	if res.MatchedCount == 0 {
+		return "", errors.New("route not found")
+	}
+	return id, nil
 }
 
 func (m *MongoDB) DeleteRoute(id string) (string, error) {

@@ -412,13 +412,22 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
           const file = selectedPhotos[i];
           const urlObj = urls.find(u => u.filename === file.name);
           if (!urlObj) continue;
+
+          console.log('Uploading to URL:', urlObj.url);
+          console.log('Headers:', {
+            'Content-Type': file.type || 'application/octet-stream',
+            'Cache-Control': 'max-age=7200'
+          });
+
           const res = await fetch(urlObj.url, {
             method: 'PUT',
             body: file,
             headers: {
-              'Content-Type': file.type || 'application/octet-stream'
+              'Content-Type': file.type || 'application/octet-stream',
+              'Cache-Control': 'max-age=7200'
             }
           });
+
           if (!res.ok) {
             toast({
               title: `❌ Failed to upload ${file.name}`,

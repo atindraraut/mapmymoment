@@ -21,14 +21,6 @@ type Waypoint struct {
 }
 
 type Photo struct {
-	ID             string   `json:"id" bson:"id"`
-	URL            string   `json:"url" bson:"url"`
-	Location       Location `json:"location" bson:"location"`
-	Description    string   `json:"description" bson:"description"`
-	LocationSource string   `json:"locationSource" bson:"locationSource"`
-}
-
-type Location struct {
-	Lat float64 `json:"lat" bson:"lat"`
-	Lng float64 `json:"lng" bson:"lng"`
+	Filename      string `json:"filename" bson:"filename"`
+	CloudfrontUrl string `json:"cloudfrontUrl" bson:"cloudfrontUrl"`
 }

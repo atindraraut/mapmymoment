@@ -21,5 +21,5 @@ func RegisterRoutes(router *http.ServeMux, storage storage.Storage) {
 	router.Handle("GET /api/my-routes", middleware.WithMiddleware(GetUserRoutes(storage), middleware.AuthMiddleware(storage)))
 
 	// S3 signed URL endpoint for image upload
-	router.Handle("POST /api/routes/{id}/generate-upload-urls", middleware.WithMiddleware(GenerateS3UploadUrlsHandler(), middleware.AuthMiddleware(storage)))
+	router.Handle("POST /api/routes/{id}/generate-upload-urls", middleware.WithMiddleware(GenerateS3UploadUrlsHandler(storage), middleware.AuthMiddleware(storage)))
 }

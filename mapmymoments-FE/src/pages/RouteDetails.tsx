@@ -272,7 +272,7 @@ const RouteDetails: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center animate-fade-in" onClick={() => setShowPhotoView(false)}>
           <div className="relative w-full max-w-4xl max-h-[90vh]">
             <img 
-              src={route.photos[currentPhotoIndex].url} 
+              src={route.photos[currentPhotoIndex].cloudfrontUrl} 
               alt={`Route photo ${currentPhotoIndex + 1}`} 
               className="w-full h-full object-contain"
               onClick={(e) => e.stopPropagation()} 
@@ -516,7 +516,7 @@ const RouteDetails: React.FC = () => {
                           setShowPhotoView(true);
                         }}
                       >
-                        <img src={photo.url} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <img src={photo.cloudfrontUrl} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
                     ))
                   ) : (
@@ -605,7 +605,7 @@ const RouteDetails: React.FC = () => {
                           setShowPhotoView(true);
                         }}
                       >
-                        <img src={photo.url} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <img src={photo.cloudfrontUrl} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       </div>
                     ))
                   ) : (

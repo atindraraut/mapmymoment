@@ -3,14 +3,17 @@ package routes
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/atindraraut/crudgo/internal/types"
 	"github.com/atindraraut/crudgo/internal/utils"
 	"github.com/atindraraut/crudgo/internal/utils/middleware"
 	"github.com/atindraraut/crudgo/internal/utils/response"
+	"github.com/atindraraut/crudgo/storage"
 )
 
 type GenerateS3UrlsRequest struct {
@@ -19,15 +22,18 @@ type GenerateS3UrlsRequest struct {
 }
 
 type S3Url struct {
-	Filename string `json:"filename"`
-	Url      string `json:"url"`
+	Filename      string `json:"filename"`
+	Url           string `json:"url"`
+	CloudfrontUrl string `json:"cloudfrontUrl"`
 }
 
 type GenerateS3UrlsResponse struct {
 	Urls []S3Url `json:"urls"`
 }
 
-func GenerateS3UploadUrlsHandler() http.HandlerFunc {
+const cloudfrontDomain = "https://d20v9h61x1jwiy.cloudfront.net"
+
+func GenerateS3UploadUrlsHandler(storage storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := middleware.GetAuthUser(r)
 		if user == nil {
@@ -70,7 +76,44 @@ func GenerateS3UploadUrlsHandler() http.HandlerFunc {
 				response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
 				return
 			}
-			urls = append(urls, S3Url{Filename: fname, Url: signedUrl})
+			urls = append(urls, S3Url{
+				Filename:      fname,
+				Url:           signedUrl,
+				CloudfrontUrl: fmt.Sprintf("%s/%s", cloudfrontDomain, key),
+			})
+		}
+		// Update the route in the database with CloudFront URLs
+		if len(urls) > 0 {
+			photos := make([]types.Photo, len(urls))
+			for i, url := range urls {
+				photos[i] = types.Photo{
+					Filename:      url.Filename,
+					CloudfrontUrl: url.CloudfrontUrl,
+				}
+			}
+			// Fetch the existing route to ensure the update is applied correctly
+			existingRoute, err := storage.GetRouteById(routeId)
+			if err != nil {
+				response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+				return
+			}
+
+			// Cast the existing route to types.Route
+			route, ok := existingRoute.(types.Route)
+			if !ok {
+				response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("invalid route type")))
+				return
+			}
+
+			// Update the photos field
+			route.Photos = photos
+
+			// Save the updated route
+			_, updateErr := storage.UpdateRoute(routeId, route)
+			if updateErr != nil {
+				response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(updateErr))
+				return
+			}
 		}
 		response.WriteJSON(w, http.StatusOK, GenerateS3UrlsResponse{Urls: urls})
 	}

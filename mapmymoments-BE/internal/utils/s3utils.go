@@ -22,6 +22,7 @@ func GeneratePresignedS3URL(bucket, key, region, contentType string, expires tim
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
+		CacheControl: aws.String("max-age=7200"), // Set Cache-Control header
 	})
 	urlStr, err := req.Presign(expires)
 	if err != nil {
