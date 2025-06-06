@@ -105,8 +105,12 @@ func GenerateS3UploadUrlsHandler(storage storage.Storage) http.HandlerFunc {
 				return
 			}
 
-			// Update the photos field
-			route.Photos = photos
+			// Append the new photos to the existing ones instead of replacing them
+			if route.Photos == nil {
+				route.Photos = photos
+			} else {
+				route.Photos = append(route.Photos, photos...)
+			}
 
 			// Save the updated route
 			_, updateErr := storage.UpdateRoute(routeId, route)

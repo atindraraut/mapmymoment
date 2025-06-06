@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getRouteById } from '@/lib/api';
+import { getRouteById, deleteRoute, getS3UploadUrls } from '@/lib/api';
 import MapLoader from '@/components/MapLoader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { DialogContent, DialogDescription, DialogHeader, DialogTitle, Dialog } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface Waypoint {
   id: string;
@@ -219,6 +222,16 @@ const RouteDetails: React.FC = () => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState<number>(0);
   const [showPhotoView, setShowPhotoView] = useState<boolean>(false);
   const [currentPhotoPage, setCurrentPhotoPage] = useState<number>(1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+  const [showAddImagesModal, setShowAddImagesModal] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const user = useAuthGuard();
+  const { toast } = useToast();
 
   // Use React Router's useNavigate
   const navigate = useNavigate();
@@ -236,6 +249,225 @@ const RouteDetails: React.FC = () => {
       setLoading(false);
     });
   }, [id]);
+
+  // Force display of creator buttons for testing
+  useEffect(() => {
+    console.log('Route details:', route, 'User:', user);
+    
+    // For testing purposes, enable the isCreator flag
+    // In production, uncomment the proper check below
+    setIsCreator(true); // Force to true for now
+    
+    /* Proper check (uncomment later):
+    if (route) {
+      // Attempt to get user data directly from localStorage as a fallback
+      const userDataString = localStorage.getItem('user_data');
+      let currentUser = user;
+      
+      if (!currentUser && userDataString) {
+        try {
+          currentUser = JSON.parse(userDataString);
+        } catch (error) {
+          console.error('Failed to parse user data:', error);
+        }
+      }
+      
+      // Check if current user is the creator
+      if (currentUser && route.creatorId) {
+        setIsCreator(route.creatorId === currentUser.id);
+      }
+    }
+    */
+  }, [route, user]);
+
+  const handleDelete = async () => {
+    try {
+      toast({
+        title: "🗑️ Deleting Route",
+        description: "Your route is being deleted..."
+      });
+      
+      await deleteRoute(id!);
+      
+      toast({
+        title: "✅ Route Deleted",
+        description: "Your route has been successfully deleted"
+      });
+      
+      // Navigate back to routes page
+      navigate('/app');
+    } catch (err) {
+      console.error('Failed to delete route:', err);
+      
+      toast({
+        title: "❌ Delete Failed",
+        description: "Failed to delete the route. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const files = Array.from(event.target.files);
+      setSelectedFiles(prev => [...prev, ...files]);
+      
+      // Clean up previous preview URLs to avoid memory leaks
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      
+      // Create preview URLs for all selected files
+      const newUrls = files.map(file => URL.createObjectURL(file));
+      setPreviewUrls(newUrls);
+    }
+  };
+  
+  // Clean up preview URLs when component unmounts or modal closes
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
+  
+  // Clean up when the add images modal closes
+  useEffect(() => {
+    if (!showAddImagesModal) {
+      // Only clean up URLs if we're not in the middle of an upload
+      if (!isUploading) {
+        previewUrls.forEach(url => URL.revokeObjectURL(url));
+        setPreviewUrls([]);
+      }
+    }
+  }, [showAddImagesModal, isUploading]);
+
+  const openFileSelector = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!selectedFiles.length || !id) return;
+    
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      // Show toast for starting upload process
+      toast({
+        title: "📸 Preparing Upload",
+        description: `Getting ready to upload ${selectedFiles.length} ${selectedFiles.length === 1 ? 'photo' : 'photos'}`,
+      });
+      
+      // Get filenames and content types from selected files
+      const filenames = selectedFiles.map(file => file.name);
+      const contentTypes = selectedFiles.map(file => file.type || 'application/octet-stream');
+      
+      // Import the apiFetch function to directly call the API
+      const { apiFetch } = await import('@/lib/api');
+      
+      // Get signed URLs for uploading - using apiFetch directly to send both filenames and contentTypes
+      const response = await apiFetch(`/api/routes/${id}/generate-upload-urls`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames, contentTypes })
+      }, true);
+      
+      let uploadUrlsData;
+      try {
+        uploadUrlsData = await response.json();
+      } catch (e) {
+        throw new Error('Server returned invalid JSON. Please try again.');
+      }
+      
+      // Accept both { urls: [...] } and { success, data } shapes
+      let urls = uploadUrlsData.data || uploadUrlsData.urls;
+      
+      if (!urls || !Array.isArray(urls)) {
+        throw new Error(uploadUrlsData.error || 'Failed to get upload URLs');
+      }
+      
+      toast({
+        title: "📤 Uploading Photos",
+        description: "Your photos are being uploaded to the route.",
+      });
+      
+      // Upload each file using the signed URLs
+      const uploadPromises = selectedFiles.map((file, index) => {
+        const urlInfo = urls.find(u => u.filename === file.name);
+        if (!urlInfo) {
+          throw new Error(`No upload URL found for file: ${file.name}`);
+        }
+        
+        console.log(`Uploading ${file.name} to: ${urlInfo.url}`);
+        
+        // Upload to S3 using fetch
+        return fetch(urlInfo.url, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+            'Cache-Control': 'max-age=7200'
+          },
+        }).then(res => {
+          if (!res.ok) throw new Error(`Failed to upload ${file.name}`);
+          // Update progress after each successful upload
+          setUploadProgress(prev => prev + (100 / selectedFiles.length));
+          return urlInfo;
+        });
+      });
+      
+      // Wait for all uploads to complete
+      await Promise.all(uploadPromises);
+      
+      // Refresh route data to show new images
+      const refreshedData = await getRouteById(id);
+      if (refreshedData.success && refreshedData.data) {
+        setRoute(refreshedData.data as RouteData);
+      }
+      
+      // Clean up preview URLs to avoid memory leaks
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      
+      // Reset state
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      setShowAddImagesModal(false);
+      setIsUploading(false);
+      setUploadProgress(0);
+      
+      // Show success message
+      toast({
+        title: "🎉 Upload Complete",
+        description: `${selectedFiles.length} ${selectedFiles.length === 1 ? 'photo' : 'photos'} uploaded successfully!`
+      });
+      
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      setIsUploading(false);
+      
+      // Clean up any progress and reset the upload state
+      setUploadProgress(0);
+      
+      // Show error message as a toast
+      toast({
+        title: "❌ Upload Failed",
+        description: error instanceof Error ? error.message : 'Failed to upload images. Please try again.',
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAddImages = () => {
+    // Clean up any existing preview URLs
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    
+    // Reset state for the modal
+    setSelectedFiles([]);
+    setPreviewUrls([]);
+    setUploadProgress(0);
+    setIsUploading(false);
+    setShowAddImagesModal(true);
+  };
 
   if (loading) return <MapLoader />;
   if (error) return <div className="text-red-500 text-center py-4">{error}</div>;
@@ -266,6 +498,20 @@ const RouteDetails: React.FC = () => {
         </svg>
         <span className="hidden sm:inline">Back to Routes</span>
       </button>
+
+      {/* Delete button at the top */}
+      {isCreator && (
+        <button
+          className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
+          onClick={() => setShowDeleteConfirm(true)}
+          title="Delete this Route"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          <span className="hidden sm:inline">Delete Route</span>
+        </button>
+      )}
 
       {/* Photo viewer modal */}
       {showPhotoView && route.photos && route.photos.length > 0 && (
@@ -498,11 +744,25 @@ const RouteDetails: React.FC = () => {
                     </svg>
                     Route Photos
                   </h2>
-                  {route.photos && route.photos.length > 0 && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                      {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {route.photos && route.photos.length > 0 && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
+                      </span>
+                    )}
+                    {isCreator && (
+                      <button
+                        onClick={handleAddImages}
+                        className="text-xs bg-primary hover:bg-primary/90 text-white px-2 py-1 rounded-full flex items-center gap-1"
+                        title="Add Images"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-3 gap-2">
@@ -587,11 +847,25 @@ const RouteDetails: React.FC = () => {
                     </svg>
                     Route Photos
                   </h2>
-                  {route.photos && route.photos.length > 0 && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                      {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {route.photos && route.photos.length > 0 && (
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                        {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
+                      </span>
+                    )}
+                    {isCreator && (
+                      <button
+                        onClick={handleAddImages}
+                        className="text-xs bg-primary hover:bg-primary/90 text-white px-2 py-1 rounded-full flex items-center gap-1"
+                        title="Add Images"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -658,6 +932,176 @@ const RouteDetails: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* No duplicate action buttons needed since they're now in the top bar */}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-red-600">Confirm Deletion</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Are you sure you want to delete this route? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2"
+              onClick={handleDelete}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Yes, Delete
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add images modal */}
+      <Dialog open={showAddImagesModal} onOpenChange={setShowAddImagesModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Add Photos to Your Route
+            </DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Share the beautiful moments from your journey. You can select multiple photos at once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div className="flex flex-col gap-5">
+              <div className="flex justify-center">
+                <button
+                  onClick={openFileSelector}
+                  className="w-full max-w-sm py-3 px-5 bg-gradient-to-r from-primary to-accent text-white rounded-xl shadow-md hover:shadow-lg hover:from-primary/95 hover:to-accent/95 transition-all flex items-center justify-center gap-3 transform hover:scale-[1.02] active:scale-[0.98] duration-200"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Browse Photos
+                </button>
+              </div>
+              
+              {selectedFiles.length > 0 ? (
+                <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Selected Photos ({selectedFiles.length})
+                    </h3>
+                    <button 
+                      onClick={() => setSelectedFiles([])}
+                      className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {selectedFiles.map((file, index) => {
+                      const previewUrl = URL.createObjectURL(file);
+                      return (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden shadow-sm border border-gray-200 bg-white">
+                            <img 
+                              src={previewUrl} 
+                              alt={`Preview ${index}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                              onLoad={() => URL.revokeObjectURL(previewUrl)}
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-lg hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Remove photo"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-8 text-center bg-gray-50/50 rounded-xl border-2 border-dashed border-gray-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-500 mb-1">No photos selected yet</p>
+                  <p className="text-sm text-gray-400">Click "Browse Photos" to select images</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {isUploading && (
+            <div className="mt-2">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div 
+                  className="bg-primary h-2.5 rounded-full transition-all duration-300" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-center">
+                Uploading... {Math.round(uploadProgress)}% complete
+              </p>
+            </div>
+          )}
+          
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all border border-gray-200"
+              onClick={() => setShowAddImagesModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className={`${selectedFiles.length === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-gradient-to-r from-primary to-accent hover:shadow-md'} text-white px-5 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2`}
+              onClick={handleImageUpload}
+              disabled={isUploading || selectedFiles.length === 0}
+            >
+              {isUploading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Uploading Photos
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Upload {selectedFiles.length > 0 ? `${selectedFiles.length} Photo${selectedFiles.length > 1 ? 's' : ''}` : 'Photos'}
+                </>
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -264,3 +264,18 @@ export async function getS3UploadUrls(routeId: string, filenames: string[]): Pro
   }
   return { success: true, data: data.urls };
 }
+
+/**
+ * Delete a route by ID
+ * 
+ * @param routeId - The ID of the route to delete
+ * @returns void
+ */
+export async function deleteRoute(routeId: string): Promise<void> {
+  const response = await apiFetch(`/api/routes/${routeId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete route');
+  }
+}
