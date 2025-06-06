@@ -253,14 +253,11 @@ const RouteDetails: React.FC = () => {
 
   // Check if the current user is the creator of this route
   useEffect(() => {
-    if (route && user) {
+    if (route ) {
       // Compare route.creatorId with user.email to determine if the current user is the creator
-      setIsCreator(route.creatorId === user.email);
-      console.log('Creator check:', { 
-        routeCreatorId: route.creatorId, 
-        userEmail: user.email, 
-        isCreator: route.creatorId === user.email
-      });
+      const email = localStorage.getItem('email');
+      console.log("email from localStorage:", email);
+      setIsCreator(route.creatorId === email);
     }
   }, [route, user]);
 
