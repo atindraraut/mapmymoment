@@ -19,6 +19,7 @@ export interface Waypoint {
 
 export interface RouteData {
   id?: string;
+  _id?: string; // For MongoDB compatibility
   name: string;
   origin: Waypoint;
   destination: Waypoint;
@@ -127,7 +128,7 @@ export async function saveRoute(routeData: RouteData): Promise<ApiResponse<{ id:
  */
 export async function getRoutes(): Promise<ApiResponse<RouteData[]>> {
   try {
-    const response = await apiFetch('/api/my-routes', {
+    const response = await apiFetch('/api/routes', {
       method: 'GET',
     });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Provider, useSelector } from 'react-redux';
 import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 
@@ -28,8 +28,11 @@ interface RoutePoint {
 
 const Application = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   useAuthGuard();
-  const [activeTab, setActiveTab] = useState<'plan' | 'route'>('plan');
+  const [activeTab, setActiveTab] = useState<'plan' | 'route'>(
+    location.state?.tab === 'route' ? 'route' : 'plan'
+  );
   const [routePreview, setRoutePreview] = useState<RoutePoint | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   
@@ -61,6 +64,10 @@ const Application = () => {
       setIsProfileOpen(false);
     }
   };
+
+  useEffect(() => {
+    if (location.state?.tab === 'route') setActiveTab('route');
+  }, [location.state]);
 
   return (
     <Provider store={store}>
