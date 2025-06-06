@@ -20,6 +20,7 @@ interface RouteData {
   _id: string;
   name: string;
   description?: string;
+  creatorId: string;
   origin: Waypoint;
   destination: Waypoint;
   intermediateWaypoints: Waypoint[];
@@ -250,34 +251,17 @@ const RouteDetails: React.FC = () => {
     });
   }, [id]);
 
-  // Force display of creator buttons for testing
+  // Check if the current user is the creator of this route
   useEffect(() => {
-    console.log('Route details:', route, 'User:', user);
-    
-    // For testing purposes, enable the isCreator flag
-    // In production, uncomment the proper check below
-    setIsCreator(true); // Force to true for now
-    
-    /* Proper check (uncomment later):
-    if (route) {
-      // Attempt to get user data directly from localStorage as a fallback
-      const userDataString = localStorage.getItem('user_data');
-      let currentUser = user;
-      
-      if (!currentUser && userDataString) {
-        try {
-          currentUser = JSON.parse(userDataString);
-        } catch (error) {
-          console.error('Failed to parse user data:', error);
-        }
-      }
-      
-      // Check if current user is the creator
-      if (currentUser && route.creatorId) {
-        setIsCreator(route.creatorId === currentUser.id);
-      }
+    if (route && user) {
+      // Compare route.creatorId with user.email to determine if the current user is the creator
+      setIsCreator(route.creatorId === user.email);
+      console.log('Creator check:', { 
+        routeCreatorId: route.creatorId, 
+        userEmail: user.email, 
+        isCreator: route.creatorId === user.email
+      });
     }
-    */
   }, [route, user]);
 
   const handleDelete = async () => {
@@ -608,13 +592,17 @@ const RouteDetails: React.FC = () => {
                     href={`https://www.google.com/maps/dir/?api=1&origin=${route.origin.lat},${route.origin.lng}&destination=${route.destination.lat},${route.destination.lng}${route.intermediateWaypoints.length > 0 ? `&waypoints=${route.intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`).join('|')}` : ''}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm gap-2 shadow-sm"
+                    className="inline-flex items-center justify-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm gap-2 shadow-sm"
+                    title="Open this route in Google Maps"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Navigate Route
+                    <div className="flex items-center gap-2">
+                      <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                        <path d="M19.527 4.799c1.212 2.608.937 5.678-.405 8.173-1.101 2.047-2.744 3.74-4.098 5.614-.619.858-1.244 1.75-1.669 2.727-.141.325-.263.658-.383.992-.121.333-.224.673-.34 1.008-.109.314-.236.684-.627.687h-.007c-.466-.001-.579-.53-.695-.887-.284-.874-.581-1.713-1.019-2.525-.51-.944-1.145-1.817-1.79-2.671L19.527 4.799zM8.545 7.705l-3.959 4.707c.724 1.54 1.821 2.863 2.871 4.18.247.31.494.622.737.936l4.984-5.925-.029.01c-1.741.601-3.691-.291-4.392-1.987a3.377 3.377 0 0 1-.209-.716c-.063-.437-.077-.761-.004-1.198l.001-.007zM5.492 3.149l-.003.004c-1.947 2.466-2.281 5.88-1.117 8.77l4.785-5.689-.058-.05-3.607-3.035zM14.661.436l-3.838 4.563a.295.295 0 0 1 .027-.01c1.6-.551 3.403.15 4.22 1.626.176.319.323.683.377 1.045.068.446.085.773.012 1.22l-.003.016 3.836-4.561A8.382 8.382 0 0 0 14.67.439l-.009-.003z" fill="#34A853"/><path d="M3.05 11.650l.021.034 4.56-5.429a.415.415 0 0 0-.025-.03l-4.56 5.429.004-.004z" fill="#FBBC04"/>
+                        <path d="M14.322 13.057c-.225 1.6-1.273 3.043-2.696 3.727-.102.047-.203.094-.305.14l-.018.007a5.25 5.25 0 0 1-1.57.45c-.442.07-.877.108-1.318.108-.602 0-1.204-.087-1.784-.26l.006-.002c-.241-.074-.476-.166-.705-.27l4.882-5.808c.087.075.173.15.26.225a5.13 5.13 0 0 1 1.33 2.121 5.568 5.568 0 0 1 .085.478c.014.077.025.155.035.233.01.075.017.149.023.224z" fill="#4285F4"/>
+                        <path d="M5.664 16.506c-1.17-.857-2.176-1.965-2.608-3.35a7.303 7.303 0 0 1-.198-5.37l4.64-5.513c-1.086-.239-2.203-.243-3.299-.007l.004-.005C1.919 3.011.622 5.193.16 7.682l-.015.095a9.64 9.64 0 0 0-.1 1.543c0 2.707 1.146 5.332 3.138 7.18l2.457-3.993h.024z" fill="#EA4335"/>
+                      </svg>
+                      <span className="font-medium">Google Maps</span>
+                    </div>
                   </a>
                 </div>
               </div>
