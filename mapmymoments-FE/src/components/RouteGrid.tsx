@@ -80,7 +80,7 @@ const RouteGrid: React.FC<RouteGridProps> = ({ onSelectRoute }) => {
 
   return (
     <div className="p-4 sm:p-5 w-full mx-auto">
-      <div className="bg-gradient-to-br from-primary/5 via-white to-accent/5 rounded-xl p-4 sm:p-6 min-h-[calc(100vh-180px)] animate-fade-in">
+      <div className="bg-gradient-to-br from-primary/5 via-white to-accent/5 rounded-xl p-4 sm:p-6 min-h-[calc(100vh-180px)] animate-fade-in md:ml-[76px]">
         <div className="flex justify-between items-center mb-5">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
             <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 text-primary">
