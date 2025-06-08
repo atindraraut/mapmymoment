@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getRouteById, deleteRoute, getS3UploadUrls } from '@/lib/api';
 import MapLoader from '@/components/MapLoader';
+import LazyImage from '@/components/LazyImage';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
@@ -449,6 +450,51 @@ const RouteDetails: React.FC = () => {
     setIsUploading(false);
     setShowAddImagesModal(true);
   };
+  
+  // Function to download image reliably from Cloudfront URL
+  const downloadImage = async (e: React.MouseEvent, imageUrl: string, fileName: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    try {
+      toast({
+        title: "Downloading image...",
+        description: "Your download will start shortly."
+      });
+      
+      // Fetch the image
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error("Failed to download image");
+      
+      // Convert the image to a blob
+      const imageBlob = await response.blob();
+      
+      // Create a URL for the blob
+      const blobUrl = URL.createObjectURL(imageBlob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      
+      // Programmatically click the link to trigger the download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 100);
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download failed",
+        description: "There was a problem downloading this image.",
+        variant: "destructive"
+      });
+    }
+  };
 
   if (loading) return <MapLoader />;
   if (error) return <div className="text-red-500 text-center py-4">{error}</div>;
@@ -498,19 +544,36 @@ const RouteDetails: React.FC = () => {
       {showPhotoView && route.photos && route.photos.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center animate-fade-in" onClick={() => setShowPhotoView(false)}>
           <div className="relative w-full max-w-4xl max-h-[90vh]">
-            <img 
+            <LazyImage 
               src={route.photos[currentPhotoIndex].cloudfrontUrl} 
               alt={`Route photo ${currentPhotoIndex + 1}`} 
               className="w-full h-full object-contain"
               onClick={(e) => e.stopPropagation()} 
+              showDownloadButton={true}
+              downloadFileName={`Route-${route.name}-Photo-${currentPhotoIndex + 1}`}
             />
-            <div className="absolute top-2 right-2">
+            <div className="absolute top-2 right-2 flex items-center gap-2">
+              {/* Download button */}
+              <a
+                href={route.photos[currentPhotoIndex].cloudfrontUrl}
+                download={`route-photo-${currentPhotoIndex + 1}.jpg`}
+                className="bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
+                onClick={(e) => e.stopPropagation()}
+                title="Download image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </a>
+              
+              {/* Close button */}
               <button 
                 className="bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowPhotoView(false);
                 }}
+                title="Close"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -761,7 +824,13 @@ const RouteDetails: React.FC = () => {
                           setShowPhotoView(true);
                         }}
                       >
-                        <img src={photo.cloudfrontUrl} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <LazyImage 
+                          src={photo.cloudfrontUrl} 
+                          alt={`Route photo ${idx + 1}`} 
+                          className="w-full h-full group-hover:scale-105 transition-transform duration-500" 
+                          showDownloadButton={true}
+                          downloadFileName={`Route-${route.name}-Photo-${idx + 1}`}
+                        />
                       </div>
                     ))
                   ) : (
@@ -864,7 +933,13 @@ const RouteDetails: React.FC = () => {
                           setShowPhotoView(true);
                         }}
                       >
-                        <img src={photo.cloudfrontUrl} alt={`Route photo ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <LazyImage 
+                          src={photo.cloudfrontUrl} 
+                          alt={`Route photo ${idx + 1}`} 
+                          className="w-full h-full group-hover:scale-105 transition-transform duration-500" 
+                          showDownloadButton={true}
+                          downloadFileName={`Route-${route.name}-Photo-${idx + 1}`}
+                        />
                       </div>
                     ))
                   ) : (
@@ -1008,11 +1083,11 @@ const RouteDetails: React.FC = () => {
                       return (
                         <div key={index} className="relative group">
                           <div className="aspect-square rounded-lg overflow-hidden shadow-sm border border-gray-200 bg-white">
-                            <img 
+                            <LazyImage 
                               src={previewUrl} 
                               alt={`Preview ${index}`}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                              onLoad={() => URL.revokeObjectURL(previewUrl)}
+                              className="w-full h-full group-hover:scale-105 transition-transform duration-300" 
+                              onClick={() => {}} 
                             />
                           </div>
                           <button
@@ -1032,7 +1107,7 @@ const RouteDetails: React.FC = () => {
               ) : (
                 <div className="py-8 text-center bg-gray-50/50 rounded-xl border-2 border-dashed border-gray-200">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
                   </svg>
                   <p className="text-gray-500 mb-1">No photos selected yet</p>
                   <p className="text-sm text-gray-400">Click "Browse Photos" to select images</p>
