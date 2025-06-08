@@ -231,13 +231,13 @@ const RouteDetails: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [routeDetailsExpanded, setRouteDetailsExpanded] = useState(false);
+  const [coverPhotoIndex, setCoverPhotoIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = useAuthGuard();
   const { toast } = useToast();
-
-  // Use React Router's useNavigate
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -496,26 +496,46 @@ const RouteDetails: React.FC = () => {
     }
   };
 
+  // Calculate photos per page based on screen size
+  const [photosPerPage, setPhotosPerPage] = useState(6);
+
+  // Update photos per page based on screen size
+  useEffect(() => {
+    const updatePhotosPerPage = () => {
+      const width = window.innerWidth;
+      if (width < 640) { // mobile
+        setPhotosPerPage(6);
+      } else if (width < 1024) { // tablet
+        setPhotosPerPage(9);
+      } else if (width < 1536) { // desktop
+        setPhotosPerPage(12);
+      } else { // large desktop
+        setPhotosPerPage(15);
+      }
+    };
+
+    updatePhotosPerPage();
+    window.addEventListener('resize', updatePhotosPerPage);
+    return () => window.removeEventListener('resize', updatePhotosPerPage);
+  }, []);
+
   if (loading) return <MapLoader />;
   if (error) return <div className="text-red-500 text-center py-4">{error}</div>;
   if (!route) return null;
-
-  const photosPerPage = 6; // Number of photos to show per page
-  const totalPhotoPages = route.photos ? Math.ceil(route.photos.length / photosPerPage) : 0;
 
   // Handler for photo pagination
   const handlePhotoPageChange = (pageNumber: number) => {
     setCurrentPhotoPage(pageNumber);
   };
 
-  // Calculate current photos to display based on pagination
-  const currentPhotos = route.photos ? 
+  const totalPhotoPages = route?.photos ? Math.ceil(route.photos.length / photosPerPage) : 0;
+  const currentPhotos = route?.photos ? 
     route.photos.slice((currentPhotoPage - 1) * photosPerPage, currentPhotoPage * photosPerPage) : 
     [];
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-primary/5 via-white to-accent/10 flex flex-col items-center p-4 sm:p-6 md:p-8">
-      {/* Back button - fixed position for easy access */}
+      {/* Back button */}
       <button 
         onClick={() => navigate('/app', { state: { tab: 'route' } })}
         className="fixed top-4 left-4 z-10 flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm text-sm font-medium rounded-full shadow-md hover:bg-white transition-all duration-300 text-primary"
@@ -526,12 +546,11 @@ const RouteDetails: React.FC = () => {
         <span className="hidden sm:inline">Back to Routes</span>
       </button>
 
-      {/* Delete button at the top */}
+      {/* Delete button for creators */}
       {isCreator && (
         <button
           className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
           onClick={() => setShowDeleteConfirm(true)}
-          title="Delete this Route"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -540,39 +559,308 @@ const RouteDetails: React.FC = () => {
         </button>
       )}
 
-      {/* Photo viewer modal */}
+      {/* Main content */}
+      <div className="w-full max-w-[2000px] mx-auto mt-14 px-4">
+        {/* Cover Photo and Route Overview */}
+        <div className="mb-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
+          {route.photos && route.photos.length > 0 ? (
+            <div className="relative h-[40vh] md:h-[50vh] lg:h-[60vh] 2xl:h-[70vh] w-full group">
+              <LazyImage 
+                src={route.photos[coverPhotoIndex].cloudfrontUrl} 
+                alt={`Cover photo for ${route.name}`}
+                className="w-full h-full object-cover"
+              />
+              {isCreator && (
+                <button
+                  onClick={() => setShowPhotoView(true)}
+                  className="absolute bottom-4 right-4 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Change Cover Photo
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="h-[40vh] md:h-[50vh] w-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+              <div className="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                </svg>
+                <p className="text-gray-600 mb-4">No photos added yet</p>
+                {isCreator && (
+                  <button
+                    onClick={() => setShowAddImagesModal(true)}
+                    className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow transition-all flex items-center gap-2 mx-auto"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Photos
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Route Quick Info */}
+          <div className="p-6">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{route.name}</h1>
+            <div className="flex flex-wrap gap-4 items-center text-sm">
+              <span className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                {route.origin.name} → {route.destination.name}
+              </span>
+              {route.intermediateWaypoints.length > 0 && (
+                <span className="flex items-center gap-2 bg-accent/10 text-accent px-3 py-1.5 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {route.intermediateWaypoints.length} {route.intermediateWaypoints.length === 1 ? 'Stop' : 'Stops'}
+                </span>
+              )}
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&origin=${route.origin.lat},${route.origin.lng}&destination=${route.destination.lat},${route.destination.lng}${route.intermediateWaypoints.length > 0 ? `&waypoints=${route.intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`).join('|')}` : ''}&travelmode=driving`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                Open in Google Maps
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Route Details and Map Card */}
+        <div className="mb-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
+            <button
+              onClick={() => setRouteDetailsExpanded(!routeDetailsExpanded)}
+              className="w-full p-6 flex items-center justify-between text-left hover:bg-gray-50/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <h2 className="text-xl font-semibold text-gray-900">Route Details & Map</h2>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-5 w-5 text-gray-500 transform transition-transform ${routeDetailsExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {routeDetailsExpanded && (
+              <div className="p-6 pt-0">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <h3 className="font-medium text-green-800 mb-2">Origin</h3>
+                      <p className="text-green-900">{route.origin.name}</p>
+                      <p className="text-sm text-green-700">{route.origin.address}</p>
+                    </div>
+
+                    <div className="p-4 bg-red-50 rounded-lg">
+                      <h3 className="font-medium text-red-800 mb-2">Destination</h3>
+                      <p className="text-red-900">{route.destination.name}</p>
+                      <p className="text-sm text-red-700">{route.destination.address}</p>
+                    </div>
+
+                    {route.intermediateWaypoints.length > 0 && (
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <h3 className="font-medium text-blue-800 mb-3">Stops</h3>
+                        <div className="space-y-3">
+                          {route.intermediateWaypoints.map((stop, index) => (
+                            <div key={stop.id} className="flex items-start gap-3">
+                              <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-200 text-blue-800 flex items-center justify-center text-sm font-medium">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className="text-blue-900">{stop.name}</p>
+                                <p className="text-sm text-blue-700">{stop.address}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="h-[400px] md:h-full min-h-[400px] rounded-lg overflow-hidden">
+                    <MiniMap route={route} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Photos Grid */}
+        <div className="mb-8">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                Photos
+                {route.photos && (
+                  <span className="text-sm font-normal text-gray-500">
+                    ({route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'})
+                  </span>
+                )}
+              </h2>
+              {isCreator && (
+                <button
+                  onClick={() => setShowAddImagesModal(true)}
+                  className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow transition-all flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Photos
+                </button>
+              )}
+            </div>
+
+            {route.photos && route.photos.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 xl:gap-5">
+                  {currentPhotos.map((photo, idx) => (
+                    <div key={idx} className="relative group aspect-square">
+                      <div
+                        className="w-full h-full rounded-lg overflow-hidden cursor-pointer"
+                        onClick={() => {
+                          setCurrentPhotoIndex((currentPhotoPage - 1) * photosPerPage + idx);
+                          setShowPhotoView(true);
+                        }}
+                      >
+                        <LazyImage
+                          src={photo.cloudfrontUrl}
+                          alt={`Route photo ${idx + 1}`}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      </div>
+                      {isCreator && (
+                        <button
+                          onClick={() => setCoverPhotoIndex((currentPhotoPage - 1) * photosPerPage + idx)}
+                          className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${
+                            (currentPhotoPage - 1) * photosPerPage + idx === coverPhotoIndex
+                              ? 'bg-primary text-white'
+                              : 'bg-black/60 text-white opacity-0 group-hover:opacity-100 hover:bg-black/80'
+                          }`}
+                          title={
+                            (currentPhotoPage - 1) * photosPerPage + idx === coverPhotoIndex
+                              ? 'Current cover photo'
+                              : 'Set as cover photo'
+                          }
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {totalPhotoPages > 1 && (
+                  <div className="flex justify-center mt-6 gap-2">
+                    <button
+                      onClick={() => handlePhotoPageChange(Math.max(1, currentPhotoPage - 1))}
+                      disabled={currentPhotoPage === 1}
+                      className={`p-2 rounded-lg ${
+                        currentPhotoPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                      }`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="flex items-center px-4 text-sm text-gray-600">
+                      Page {currentPhotoPage} of {totalPhotoPages}
+                    </span>
+                    <button
+                      onClick={() => handlePhotoPageChange(Math.min(totalPhotoPages, currentPhotoPage + 1))}
+                      disabled={currentPhotoPage === totalPhotoPages}
+                      className={`p-2 rounded-lg ${
+                        currentPhotoPage === totalPhotoPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
+                      }`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-12 bg-gray-50 rounded-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
+                </svg>
+                <p className="text-gray-600 mb-2">No photos available for this route</p>
+                <p className="text-sm text-gray-500">Add some photos to showcase your journey</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Photo Viewer Modal */}
       {showPhotoView && route.photos && route.photos.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center animate-fade-in" onClick={() => setShowPhotoView(false)}>
-          <div className="relative w-full max-w-4xl max-h-[90vh]">
-            <LazyImage 
-              src={route.photos[currentPhotoIndex].cloudfrontUrl} 
-              alt={`Route photo ${currentPhotoIndex + 1}`} 
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center animate-fade-in"
+             onClick={() => setShowPhotoView(false)}>
+          <div className="relative w-full max-w-5xl max-h-[90vh] px-4">
+            <LazyImage
+              src={route.photos[currentPhotoIndex].cloudfrontUrl}
+              alt={`Route photo ${currentPhotoIndex + 1}`}
               className="w-full h-full object-contain"
-              onClick={(e) => e.stopPropagation()} 
               showDownloadButton={true}
               downloadFileName={`Route-${route.name}-Photo-${currentPhotoIndex + 1}`}
             />
-            <div className="absolute top-2 right-2 flex items-center gap-2">
-              {/* Download button */}
-              <a
-                href={route.photos[currentPhotoIndex].cloudfrontUrl}
-                download={`route-photo-${currentPhotoIndex + 1}.jpg`}
-                className="bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
-                onClick={(e) => e.stopPropagation()}
-                title="Download image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-              </a>
+
+            <div className="absolute top-4 right-4 flex items-center gap-2">
+              {isCreator && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCoverPhotoIndex(currentPhotoIndex);
+                  }}
+                  className={`p-2 rounded-full transition-all ${
+                    currentPhotoIndex === coverPhotoIndex
+                      ? 'bg-primary text-white'
+                      : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
+                  title={currentPhotoIndex === coverPhotoIndex ? 'Current cover photo' : 'Set as cover photo'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" />
+                  </svg>
+                </button>
+              )}
               
-              {/* Close button */}
-              <button 
-                className="bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowPhotoView(false);
                 }}
+                className="p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-all"
                 title="Close"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -580,10 +868,11 @@ const RouteDetails: React.FC = () => {
                 </svg>
               </button>
             </div>
+
             {route.photos.length > 1 && (
               <>
-                <button 
-                  className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
+                <button
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();
                     setCurrentPhotoIndex((prev) => (prev - 1 + route.photos!.length) % route.photos!.length);
@@ -593,8 +882,8 @@ const RouteDetails: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <button 
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/20 backdrop-blur-sm rounded-full p-2 text-white hover:bg-white/30 transition-all"
+                <button
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-all"
                   onClick={(e) => {
                     e.stopPropagation();
                     setCurrentPhotoIndex((prev) => (prev + 1) % route.photos!.length);
@@ -606,394 +895,13 @@ const RouteDetails: React.FC = () => {
                 </button>
               </>
             )}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full text-white text-sm">
+
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full text-white text-sm">
               {currentPhotoIndex + 1} / {route.photos.length}
             </div>
           </div>
         </div>
       )}
-
-      <div className="w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl mx-auto mt-14 sm:mt-16">
-        {/* Main content section - two column on large screens */}
-        <div className="lg:flex lg:gap-6 xl:gap-8">
-          {/* Left column with route details */}
-          <div className="lg:w-[40%] xl:w-[35%] lg:flex-shrink-0">
-            {/* Main card with route summary */}
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-5 sm:p-8 mb-6 border border-white/40 transition-all duration-300 hover:shadow-2xl animate-fade-in relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-primary/5 rounded-2xl -z-10"></div>
-              
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-4 tracking-tight">{route.name}</h1>
-              
-              <div className="mb-4 space-y-2">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <div className="flex items-center">
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-green-100 text-green-700 mr-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
-                    </span>
-                    <span className="text-gray-800">{route.origin.name}</span>
-                  </div>
-                  
-                  <div className="hidden sm:block text-gray-400">→</div>
-                  
-                  <div className="flex items-center">
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-red-100 text-red-700 mr-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      </svg>
-                    </span>
-                    <span className="text-gray-800">{route.destination.name}</span>
-                  </div>
-                </div>
-                
-                <div className="flex justify-end">
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${route.origin.lat},${route.origin.lng}&destination=${route.destination.lat},${route.destination.lng}${route.intermediateWaypoints.length > 0 ? `&waypoints=${route.intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`).join('|')}` : ''}&travelmode=driving`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-3 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm gap-2 shadow-sm"
-                    title="Open this route in Google Maps"
-                  >
-                    <div className="flex items-center gap-2">
-                      <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M19.527 4.799c1.212 2.608.937 5.678-.405 8.173-1.101 2.047-2.744 3.74-4.098 5.614-.619.858-1.244 1.75-1.669 2.727-.141.325-.263.658-.383.992-.121.333-.224.673-.34 1.008-.109.314-.236.684-.627.687h-.007c-.466-.001-.579-.53-.695-.887-.284-.874-.581-1.713-1.019-2.525-.51-.944-1.145-1.817-1.79-2.671L19.527 4.799zM8.545 7.705l-3.959 4.707c.724 1.54 1.821 2.863 2.871 4.18.247.31.494.622.737.936l4.984-5.925-.029.01c-1.741.601-3.691-.291-4.392-1.987a3.377 3.377 0 0 1-.209-.716c-.063-.437-.077-.761-.004-1.198l.001-.007zM5.492 3.149l-.003.004c-1.947 2.466-2.281 5.88-1.117 8.77l4.785-5.689-.058-.05-3.607-3.035zM14.661.436l-3.838 4.563a.295.295 0 0 1 .027-.01c1.6-.551 3.403.15 4.22 1.626.176.319.323.683.377 1.045.068.446.085.773.012 1.22l-.003.016 3.836-4.561A8.382 8.382 0 0 0 14.67.439l-.009-.003z" fill="#34A853"/><path d="M3.05 11.650l.021.034 4.56-5.429a.415.415 0 0 0-.025-.03l-4.56 5.429.004-.004z" fill="#FBBC04"/>
-                        <path d="M14.322 13.057c-.225 1.6-1.273 3.043-2.696 3.727-.102.047-.203.094-.305.14l-.018.007a5.25 5.25 0 0 1-1.57.45c-.442.07-.877.108-1.318.108-.602 0-1.204-.087-1.784-.26l.006-.002c-.241-.074-.476-.166-.705-.27l4.882-5.808c.087.075.173.15.26.225a5.13 5.13 0 0 1 1.33 2.121 5.568 5.568 0 0 1 .085.478c.014.077.025.155.035.233.01.075.017.149.023.224z" fill="#4285F4"/>
-                        <path d="M5.664 16.506c-1.17-.857-2.176-1.965-2.608-3.35a7.303 7.303 0 0 1-.198-5.37l4.64-5.513c-1.086-.239-2.203-.243-3.299-.007l.004-.005C1.919 3.011.622 5.193.16 7.682l-.015.095a9.64 9.64 0 0 0-.1 1.543c0 2.707 1.146 5.332 3.138 7.18l2.457-3.993h.024z" fill="#EA4335"/>
-                      </svg>
-                      <span className="font-medium">Google Maps</span>
-                    </div>
-                  </a>
-                </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-2">
-                <span className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  {route.intermediateWaypoints.length} {route.intermediateWaypoints.length === 1 ? 'Stop' : 'Stops'}
-                </span>
-                
-                {route.photos && route.photos.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setCurrentPhotoIndex(0);
-                      setShowPhotoView(true);
-                    }}
-                    className="bg-accent/10 text-accent px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-accent/20 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {route.photos.length} {route.photos.length === 1 ? 'Photo' : 'Photos'}
-                  </button>
-                )}
-                
-                {route.createdAt && (
-                  <span className="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {new Date(route.createdAt).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Route details */}
-            <div className="mb-6 animate-fade-in">
-              <div className="text-gray-800 p-5 sm:p-6 rounded-2xl bg-white/80 backdrop-blur-sm border border-white/40 shadow-lg">
-                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-primary">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Route Details
-                </h2>
-                
-                <div className="space-y-4">
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                    <div className="flex items-start">
-                      <div className="flex-1">
-                        <p className="flex items-start">
-                          <span className="font-medium text-green-700 mr-2 mt-0.5">Origin:</span> 
-                          <span className="text-gray-700">{route.origin.name}, {route.origin.address}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-3 bg-red-50 rounded-lg border border-red-100">
-                    <div className="flex items-start">
-                      <div className="flex-1">
-                        <p className="flex items-start">
-                          <span className="font-medium text-red-700 mr-2 mt-0.5">Destination:</span> 
-                          <span className="text-gray-700">{route.destination.name}, {route.destination.address}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {route.intermediateWaypoints.length > 0 && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium text-blue-700 flex items-center gap-1.5">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                          Stops
-                        </h3>
-                      </div>
-                      <ul className="space-y-1.5">
-                        {route.intermediateWaypoints.map((wp, index) => (
-                          <li key={wp.id} className="flex items-start">
-                            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-200 text-blue-700 text-xs mt-0.5">{index + 1}</span>
-                            <span className="text-gray-700 mx-2 flex-1">{wp.name}, {wp.address}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {/* <div className="mt-4">
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${route.origin.lat},${route.origin.lng}&destination=${route.destination.lat},${route.destination.lng}${route.intermediateWaypoints.length > 0 ? `&waypoints=${route.intermediateWaypoints.map(wp => `${wp.lat},${wp.lng}`).join('|')}` : ''}&travelmode=driving`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 shadow-md transition-all"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                      </svg>
-                      Open in Google Maps
-                    </a>
-                  </div> */}
-                </div>
-                
-                <div className="mt-6 pt-4 border-t border-gray-100">
-                  <p className="text-sm text-gray-500 flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Route created on: {new Date(route.createdAt || 0).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Photos preview - Mobile only */}
-            <div className="mb-6 lg:hidden animate-fade-in">
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-lg border border-white/40">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold flex items-center gap-2 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Route Photos
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {route.photos && route.photos.length > 0 && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
-                      </span>
-                    )}
-                    {isCreator && (
-                      <button
-                        onClick={handleAddImages}
-                        className="text-xs bg-primary hover:bg-primary/90 text-white px-2 py-1 rounded-full flex items-center gap-1"
-                        title="Add Images"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add
-                      </button>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2">
-                  {route.photos && route.photos.length > 0 ? (
-                    currentPhotos.map((photo, idx) => (
-                      <div 
-                        key={idx} 
-                        className="aspect-square bg-gray-100 rounded-lg overflow-hidden shadow hover:shadow-md transition-all duration-300 group cursor-pointer"
-                        onClick={() => {
-                          setCurrentPhotoIndex((currentPhotoPage - 1) * photosPerPage + idx);
-                          setShowPhotoView(true);
-                        }}
-                      >
-                        <LazyImage 
-                          src={photo.cloudfrontUrl} 
-                          alt={`Route photo ${idx + 1}`} 
-                          className="w-full h-full group-hover:scale-105 transition-transform duration-500" 
-                          showDownloadButton={true}
-                          downloadFileName={`Route-${route.name}-Photo-${idx + 1}`}
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-full p-8 text-center bg-gray-50 rounded-xl border border-gray-100">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
-                      </svg>
-                      <p className="text-gray-500 mb-2">No photos available for this route.</p>
-                      <p className="text-xs text-gray-400">Photos can be added when creating or editing a route.</p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Pagination for Photos - Mobile */}
-                {totalPhotoPages > 1 && (
-                  <div className="flex justify-center mt-4 gap-1">
-                    <button
-                      onClick={() => handlePhotoPageChange(Math.max(1, currentPhotoPage - 1))}
-                      disabled={currentPhotoPage === 1}
-                      className={`px-2 py-1 rounded ${
-                        currentPhotoPage === 1 
-                        ? 'bg-gray-100 text-gray-400' 
-                        : 'bg-primary/10 text-primary hover:bg-primary/20'
-                      }`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <div className="flex items-center px-2 text-sm">
-                      {currentPhotoPage} / {totalPhotoPages}
-                    </div>
-                    <button
-                      onClick={() => handlePhotoPageChange(Math.min(totalPhotoPages, currentPhotoPage + 1))}
-                      disabled={currentPhotoPage === totalPhotoPages}
-                      className={`px-2 py-1 rounded ${
-                        currentPhotoPage === totalPhotoPages 
-                        ? 'bg-gray-100 text-gray-400' 
-                        : 'bg-primary/10 text-primary hover:bg-primary/20'
-                      }`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Right column with map and photos (on desktop) */}
-          <div className="lg:flex-grow mt-6 lg:mt-0">
-            {/* Map container */}
-            <div className="rounded-2xl overflow-hidden shadow-lg bg-white border border-white/40 transition-all duration-200 hover:shadow-xl h-full">
-              <div className="lg:h-[calc(100vh-300px)] xl:h-[calc(100vh-280px)]">
-                <MiniMap route={route} />
-              </div>
-            </div>
-            
-            {/* Photos section - Desktop only */}
-            <div className="hidden lg:block mt-6">
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 shadow-lg border border-white/40">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-semibold flex items-center gap-2 text-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Route Photos
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    {route.photos && route.photos.length > 0 && (
-                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                        {route.photos.length} {route.photos.length === 1 ? 'photo' : 'photos'}
-                      </span>
-                    )}
-                    {isCreator && (
-                      <button
-                        onClick={handleAddImages}
-                        className="text-xs bg-primary hover:bg-primary/90 text-white px-2 py-1 rounded-full flex items-center gap-1"
-                        title="Add Images"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Add
-                      </button>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {route.photos && route.photos.length > 0 ? (
-                    currentPhotos.map((photo, idx) => (
-                      <div 
-                        key={idx} 
-                        className="aspect-square bg-gray-100 rounded-lg overflow-hidden shadow hover:shadow-md transition-all duration-300 group cursor-pointer"
-                        onClick={() => {
-                          setCurrentPhotoIndex((currentPhotoPage - 1) * photosPerPage + idx);
-                          setShowPhotoView(true);
-                        }}
-                      >
-                        <LazyImage 
-                          src={photo.cloudfrontUrl} 
-                          alt={`Route photo ${idx + 1}`} 
-                          className="w-full h-full group-hover:scale-105 transition-transform duration-500" 
-                          showDownloadButton={true}
-                          downloadFileName={`Route-${route.name}-Photo-${idx + 1}`}
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-full p-8 text-center bg-gray-50 rounded-xl border border-gray-100">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
-                      </svg>
-                      <p className="text-gray-500 mb-2">No photos available for this route.</p>
-                      <p className="text-sm text-gray-400">Photos can be added when creating or editing a route.</p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Pagination for Photos - Desktop */}
-                {totalPhotoPages > 1 && (
-                  <div className="flex justify-center mt-4 gap-1">
-                    <button
-                      onClick={() => handlePhotoPageChange(Math.max(1, currentPhotoPage - 1))}
-                      disabled={currentPhotoPage === 1}
-                      className={`px-2 py-1 rounded ${
-                        currentPhotoPage === 1 
-                        ? 'bg-gray-100 text-gray-400' 
-                        : 'bg-primary/10 text-primary hover:bg-primary/20'
-                      }`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <div className="flex items-center px-2 text-sm">
-                      {currentPhotoPage} / {totalPhotoPages}
-                    </div>
-                    <button
-                      onClick={() => handlePhotoPageChange(Math.min(totalPhotoPages, currentPhotoPage + 1))}
-                      disabled={currentPhotoPage === totalPhotoPages}
-                      className={`px-2 py-1 rounded ${
-                        currentPhotoPage === totalPhotoPages 
-                        ? 'bg-gray-100 text-gray-400' 
-                        : 'bg-primary/10 text-primary hover:bg-primary/20'
-                      }`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* No duplicate action buttons needed since they're now in the top bar */}
 
       {/* Delete confirmation dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
