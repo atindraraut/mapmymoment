@@ -52,3 +52,11 @@ func (m *MongoDB) CreateUser(user types.UserData) (int64, error) {
 	}
 	return int64(id.Timestamp().Unix()), nil // Not a real int64 ID, but for interface compatibility
 }
+
+func (m *MongoDB) UpdateUserPassword(email, hashedPassword string) error {
+	ctx := context.Background()
+	coll := m.database.Collection("users")
+	update := bson.M{"$set": bson.M{"password": hashedPassword}}
+	_, err := coll.UpdateOne(ctx, bson.M{"email": email}, update)
+	return err
+}

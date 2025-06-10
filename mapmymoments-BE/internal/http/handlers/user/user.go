@@ -165,6 +165,85 @@ func refresh(storage storage.Storage) http.HandlerFunc {
 	}
 }
 
+// Handler: Request password reset (send OTP)
+func requestPasswordReset(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		type reqBody struct {
+			Email string `json:"email" validate:"required,email"`
+		}
+		var req reqBody
+		if err := decodeAndValidate(r, &req); err != nil {
+			writeValidationError(w, err)
+			return
+		}
+		user, err := storage.GetUserByEmail(req.Email)
+		if err != nil || user.Email == "" {
+			// Don't reveal if user exists
+			response.WriteJSON(w, http.StatusOK, map[string]string{"message": "If your email exists, a reset code has been sent."})
+			return
+		}
+		otp := auth.GenerateOTP()
+		err = auth.SendResetPasswordEmail(req.Email, otp)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to send reset code email")))
+			return
+		}
+		otpRecord := types.OTPRecord{
+			Email:     req.Email,
+			OTP:       otp,
+			ExpiresAt: time.Now().Add(10 * time.Minute),
+		}
+		err = storage.SaveOTPRecord(otpRecord)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to save OTP record")))
+			return
+		}
+		response.WriteJSON(w, http.StatusOK, map[string]string{"message": "If your email exists, a reset code has been sent."})
+	}
+}
+
+// Handler: Reset password using OTP
+func resetPassword(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		type reqBody struct {
+			Email    string `json:"email" validate:"required,email"`
+			OTP      string `json:"token" validate:"required"`
+			Password string `json:"password" validate:"required,min=6"`
+		}
+		var req reqBody
+		if err := decodeAndValidate(r, &req); err != nil {
+			writeValidationError(w, err)
+			return
+		}
+		record, err := storage.GetOTPRecordByEmail(req.Email)
+		if err != nil || record.Email == "" || record.ExpiresAt.Before(time.Now()) {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("OTP expired or not found")))
+			return
+		}
+		if record.OTP != req.OTP {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("invalid OTP")))
+			return
+		}
+		hashedPassword, err := hashPassword(req.Password)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to hash password")))
+			return
+		}
+		user, err := storage.GetUserByEmail(req.Email)
+		if err != nil || user.Email == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("user not found")))
+			return
+		}
+		user.Password = hashedPassword
+		if err := storage.UpdateUserPassword(user.Email, hashedPassword); err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to update password")))
+			return
+		}
+		_ = storage.DeleteOTPRecordByEmail(req.Email)
+		response.WriteJSON(w, http.StatusOK, map[string]string{"message": "Password reset successful"})
+	}
+}
+
 // Helper: hash password
 func hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

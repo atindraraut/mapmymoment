@@ -14,4 +14,5 @@ type Storage interface {
 	GetAllRoutes() ([]interface{}, error)
 	UpdateRoute(id string, route interface{}) (string, error)
 	DeleteRoute(id string) (string, error)
+	UpdateUserPassword(email, hashedPassword string) error
 }

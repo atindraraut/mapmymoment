@@ -141,6 +141,85 @@ func SendEmailOTP(email, otp string) error {
 	return nil
 }
 
+// SendResetPasswordEmail sends a reset password OTP email with a distinct template
+func SendResetPasswordEmail(email, otp string) error {
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-east-1"),
+	})
+	if err != nil {
+		slog.Error("Failed to create AWS session", err)
+		return err
+	}
+
+	svc := ses.New(sess)
+
+	subject := "Reset your MapMyMoments password"
+	htmlBody := `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reset Your Password</title>
+  <style>
+    body { background: #f8fafc; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+    .container { max-width: 420px; margin: 48px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px #0001; padding: 32px 28px; border: 1px solid #e5e7eb; }
+    .logo { text-align: center; margin-bottom: 18px; }
+    .logo img { width: 40px; }
+    .title { color: #1e293b; font-size: 1.35rem; font-weight: 600; text-align: center; margin-bottom: 6px; letter-spacing: 0.01em; }
+    .subtitle { color: #475569; text-align: center; margin-bottom: 22px; font-size: 1rem; font-weight: 400; }
+    .otp-box { background: #f1f5f9; border-radius: 6px; padding: 14px 0; text-align: center; font-size: 1.7rem; font-weight: 600; letter-spacing: 0.28em; color: #0f172a; margin-bottom: 12px; font-family: 'Fira Mono', 'Consolas', monospace; user-select: all; border: 1px solid #e2e8f0; }
+    .footer { color: #64748b; font-size: 0.95rem; text-align: center; margin-top: 28px; border-top: 1px solid #e5e7eb; padding-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <img src="https://i.imgur.com/2yaf2wb.png" alt="MapMyMoments Logo" />
+    </div>
+    <div class="title">Reset your password</div>
+    <div class="subtitle">Use the code below to reset your MapMyMoments password.</div>
+    <div class="otp-box" id="otp">` + otp + `</div>
+    <div class="footer">
+      This code is valid for 10 minutes.<br>
+      If you did not request a password reset, you can safely ignore this email.<br><br>
+      &copy; ` + fmt.Sprint(time.Now().Year()) + ` MapMyMoments
+    </div>
+  </div>
+</body>
+</html>
+`
+
+	input := &ses.SendEmailInput{
+		Destination: &ses.Destination{
+			ToAddresses: []*string{
+				aws.String(email),
+			},
+		},
+		Message: &ses.Message{
+			Body: &ses.Body{
+				Html: &ses.Content{
+					Charset: aws.String("UTF-8"),
+					Data:    aws.String(htmlBody),
+				},
+			},
+			Subject: &ses.Content{
+				Charset: aws.String("UTF-8"),
+				Data:    aws.String(subject),
+			},
+		},
+		Source: aws.String("hello@mapmymoments.in"),
+	}
+
+	_, err = svc.SendEmail(input)
+	if err != nil {
+		slog.Error("Failed to send reset password email", err)
+		return err
+	}
+
+	slog.Info("Reset password email sent successfully")
+	return nil
+}
+
 func GenerateOTP() string {
 	return fmt.Sprintf("%06d", rand.Intn(1000000))
 }
