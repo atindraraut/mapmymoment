@@ -68,6 +68,9 @@ const Login = () => {
               <div>
                 <label className="block mb-1 text-sm font-medium text-primary">Password</label>
                 <input type="password" name="password" value={form.password} onChange={handleChange} className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" required />
+                <div className="text-right mt-1">
+                  <Link to="/request-reset" className="text-xs text-primary hover:underline">Forgot password?</Link>
+                </div>
               </div>
               <Button className="w-full bg-primary text-white hover:bg-primary/90 py-2 text-lg rounded" disabled={loading}>{loading ? 'Logging In...' : 'Log In'}</Button>
             </form>

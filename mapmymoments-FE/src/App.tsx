@@ -13,6 +13,8 @@ import Application from "./pages/Application";
 import { APIProvider } from '@vis.gl/react-google-maps';
 import MapLoader from '@/components/MapLoader';
 import RouteDetails from "./pages/RouteDetails";
+import RequestReset from './pages/RequestReset';
+import ResetPassword from './pages/ResetPassword';
 
 const queryClient = new QueryClient();
 
@@ -41,6 +43,8 @@ const App = () => {
               <Route path="/signup" element={<SignUp />} />
               <Route path="/app" element={<Application />} />
               <Route path="/route/:id" element={<Suspense fallback={<MapLoader />}><RouteDetails /></Suspense>} />
+              <Route path="/request-reset" element={<RequestReset />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
