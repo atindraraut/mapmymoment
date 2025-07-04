@@ -29,10 +29,11 @@ type Props = {
   children?: ReactNode;
   onPlaceSelect?: (place: google.maps.places.PlaceResult | null, type: 'origin' | 'destination' | 'stop', stopId?: string) => void;
   onPreviewRoute?: (points: { origin: string; destination: string; stops: Stop[] }) => void;
+  onClearPreview?: () => void;
   onClose: () => void;
 }
 
-export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, onClose }: Props) {
+export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, onClearPreview, onClose }: Props) {
   const { toast } = useToast();
   const dispatch = useDispatch<AppDispatch>();
   
@@ -73,6 +74,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [savedRouteId, setSavedRouteId] = useState<string | null>(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
 
   const placesLib = useMapsLibrary('places');
 
@@ -230,8 +232,14 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
         destination: destination.name, 
         stops 
       });
+      setIsPreviewMode(true);
     }
-    toast({ title: "Previewing Route", description: "Showing the route on the map." });
+  };
+
+  const handleExitPreview = () => {
+    setIsPreviewMode(false);
+    // Keep the preview route on map when just switching back to edit mode
+    // Don't clear it here since user might want to preview again
   };
 
   const handleSave = async () => {
@@ -313,6 +321,11 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   };
 
   const handleResetForNewRoute = () => {
+    // Clear preview route from map
+    if (onClearPreview) {
+      onClearPreview();
+    }
+    
     // Reset Redux state for new route
     dispatch(setRouteName(''));
     dispatch(setOrigin(null));
@@ -324,6 +337,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     setSelectedPhotos([]);
     setPreviewUrls([]);
     setIsFormExpanded(false);
+    setIsPreviewMode(false);
     
     // Clear photo URLs
     previewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -393,7 +407,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
           return;
         }
         // Accept both { urls: [...] } and { success, data } shapes
-        let urls = urlRes.data || urlRes.urls;
+        const urls = urlRes.data || urlRes.urls;
         if (!urls || !Array.isArray(urls)) {
           toast({
             title: "❌ Failed to get upload URLs",
@@ -465,6 +479,11 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   };
 
   const handleCollapseModal = () => {
+    // Clear preview route from map
+    if (onClearPreview) {
+      onClearPreview();
+    }
+    
     // Reset Redux state
     dispatch(setRouteName(''));
     dispatch(setOrigin(null));
@@ -476,6 +495,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     setSelectedPhotos([]);
     setPreviewUrls([]);
     setIsFormExpanded(false);
+    setIsPreviewMode(false);
     
     // Clear input values
     setOriginInputValue('');
@@ -486,6 +506,11 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   };
 
   const handleCloseAndReset = () => {
+    // Clear preview route from map
+    if (onClearPreview) {
+      onClearPreview();
+    }
+    
     // Reset Redux state
     dispatch(setRouteName(''));
     dispatch(setOrigin(null));
@@ -499,6 +524,7 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
     setSavedRouteId(null);
     setIsSaving(false);
     setIsUploading(false);
+    setIsPreviewMode(false);
     
     // Clean up resources
     previewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -510,8 +536,13 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
   useEffect(() => {
     if (!isOpen) {
       setIsFormExpanded(false);
+      setIsPreviewMode(false);
+      // Clear preview route when modal is closed
+      if (onClearPreview) {
+        onClearPreview();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, onClearPreview]);
 
   if (!isOpen) {
     return null;
@@ -524,21 +555,53 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
       {/* Responsive Floating Container */}
       <div className={cn(
         "absolute pointer-events-auto",
-        // Mobile positioning (full width with margins)
-        "top-4 left-4 right-4",
-        "w-auto max-w-none",
-        // Tablet positioning
-        "sm:top-6 sm:left-6 sm:right-auto sm:w-full sm:max-w-md",
-        // Desktop positioning (avoid sidebar overlap)
-        "lg:left-24 lg:max-w-lg",
+        // Preview mode positioning - minimized at bottom
+        isPreviewMode ? (
+          "bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-auto sm:w-full sm:max-w-sm lg:left-24 lg:max-w-md"
+        ) : (
+          // Normal positioning
+          "top-4 left-4 right-4 w-auto max-w-none sm:top-6 sm:left-6 sm:right-auto sm:w-full sm:max-w-md lg:left-24 lg:max-w-lg"
+        ),
         "bg-white rounded-lg shadow-xl border border-gray-200/50",
         "transform transition-all duration-300 ease-out",
         isFormExpanded 
           ? "translate-y-0 opacity-100 scale-100" 
           : "translate-y-0 opacity-100 scale-100"
       )}>
+        {/* Preview Mode - Minimized Header */}
+        {isPreviewMode && (
+          <div className="flex items-center justify-between p-3 border-b border-gray-100/50">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">👁️</span>
+              </div>
+              <h3 className="text-sm font-semibold text-gray-700">
+                Route Preview
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleExitPreview}
+                className="px-3 py-1 text-xs border-gray-300 hover:border-gray-400 transition-colors"
+              >
+                ✏️ Edit
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleCollapseModal}
+                className="w-6 h-6 rounded-full hover:bg-gray-100/50 transition-colors"
+              >
+                ✕
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Expanded Header with Close Button */}
-        {isFormExpanded && (
+        {isFormExpanded && !isPreviewMode && (
           <div className="flex items-center justify-between p-4 border-b border-gray-100/50">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center">
@@ -560,8 +623,36 @@ export default function NewPlanModal({ isOpen, onPlaceSelect, onPreviewRoute, on
         )}
 
         {/* Content Area */}
-        <div className="max-h-[calc(100vh-16rem)] sm:max-h-[calc(100vh-12rem)] lg:max-h-[calc(100vh-8rem)] overflow-y-auto custom-scrollbar">
-          {!isFormExpanded ? (
+        <div className={cn(
+          "overflow-y-auto custom-scrollbar",
+          isPreviewMode 
+            ? "max-h-32" 
+            : "max-h-[calc(100vh-16rem)] sm:max-h-[calc(100vh-12rem)] lg:max-h-[calc(100vh-8rem)]"
+        )}>
+          {isPreviewMode ? (
+            // Preview mode - show compact route summary
+            <div className="p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-gray-700 truncate flex-1">{origin?.name || 'Origin'}</span>
+              </div>
+              {stops.map((stop, index) => (
+                <div key={stop.id} className="flex items-center gap-2 text-sm">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ml-0.5"></div>
+                  <span className="text-gray-600 truncate flex-1">{stop.name}</span>
+                </div>
+              ))}
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <span className="text-gray-700 truncate flex-1">{destination?.name || 'Destination'}</span>
+              </div>
+              <div className="flex justify-center items-center pt-2 border-t border-gray-100">
+                <span className="text-xs text-gray-500">
+                  {stops.length > 0 ? `${stops.length} stop${stops.length > 1 ? 's' : ''}` : 'Direct route'}
+                </span>
+              </div>
+            </div>
+          ) : !isFormExpanded ? (
             // Initial state - only origin input visible with floating style
             <div className="p-4">
               <div className="relative">

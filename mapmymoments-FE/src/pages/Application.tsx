@@ -62,7 +62,10 @@ const Application = () => {
 
   const handlePreviewRoute = (points: RoutePoint) => {
     setRoutePreview(points);
-    // TODO: Draw route line between points using Google Maps Directions service
+  };
+
+  const handleClearPreview = () => {
+    setRoutePreview(null);
   };
 
   // Update to handle tab changes more consistently with profile state
@@ -171,6 +174,7 @@ const Application = () => {
         userData={userData}
         handleLogout={handleLogout}
         handlePreviewRoute={handlePreviewRoute}
+        handleClearPreview={handleClearPreview}
         authInfo={authInfo}
         onLinkGoogle={handleLinkGoogle}
         onUnlinkGoogle={handleUnlinkGoogle}
@@ -202,6 +206,7 @@ interface ApplicationContentProps {
   userData: { firstName: string; lastName: string; email: string };
   handleLogout: () => void;
   handlePreviewRoute: (points: RoutePoint) => void;
+  handleClearPreview: () => void;
   authInfo: UserAuthInfo | null;
   onLinkGoogle: () => void;
   onUnlinkGoogle: () => void;
@@ -239,6 +244,7 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
   userData,
   handleLogout,
   handlePreviewRoute,
+  handleClearPreview,
   authInfo,
   onLinkGoogle,
   onUnlinkGoogle,
@@ -253,6 +259,7 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
           <NewPlanModal
             isOpen={activeTab === 'plan' && !isProfileOpen}
             onPreviewRoute={handlePreviewRoute}
+            onClearPreview={handleClearPreview}
             onClose={() => setActiveTab('route')}
           />
         );
@@ -289,15 +296,9 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
             className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
             style={{ touchAction: 'auto' }}
           >
-            {/* Display route from Redux */}
+            {/* Display route from Redux or preview */}
             {activeTab === 'route' && <RouteDisplay />}
-            {/* Legacy route preview markers */}
-            {routePreview?.stops.map((stop) => (
-              <Marker
-                key={stop.id}
-                position={{ lat: stop.lat, lng: stop.lng }}
-              />
-            ))}
+            {activeTab === 'plan' && <RouteDisplay previewData={routePreview} />}
           </Map>
           <MapSidebar
             tabs={TAB_CONFIG}

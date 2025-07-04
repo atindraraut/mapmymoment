@@ -5,7 +5,22 @@ import { RootState } from '@/store';
 import { setRouteInfo } from '@/store/routeSlice';
 import MarkerTooltip from './MarkerTooltip';
 
-const RouteDisplay: React.FC = () => {
+interface PreviewData {
+  origin: string;
+  destination: string;
+  stops: Array<{
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
+}
+
+interface RouteDisplayProps {
+  previewData?: PreviewData | null;
+}
+
+const RouteDisplay: React.FC<RouteDisplayProps> = ({ previewData }) => {
   const map = useMap();
   const dispatch = useDispatch();
   const { origin, destination, stops } = useSelector((state: RootState) => state.route);
@@ -14,13 +29,13 @@ const RouteDisplay: React.FC = () => {
   useEffect(() => {
     if (!map) return;
 
-    // Initialize directions renderer
+    // Initialize directions renderer with different styling based on preview mode
     const renderer = new google.maps.DirectionsRenderer({
       suppressMarkers: true, // We'll use custom markers
       polylineOptions: {
-        strokeColor: '#2563eb',
-        strokeWeight: 5,
-        strokeOpacity: 0.8,
+        strokeColor: previewData ? '#9333ea' : '#2563eb', // Purple for preview, blue for saved
+        strokeWeight: previewData ? 6 : 5,
+        strokeOpacity: previewData ? 0.9 : 0.8,
         geodesic: true,
       },
     });
@@ -30,15 +45,31 @@ const RouteDisplay: React.FC = () => {
     return () => {
       renderer.setMap(null);
     };
-  }, [map]);
+  }, [map, previewData]);
 
   useEffect(() => {
-    if (!directionsRenderer || !origin || !destination) return;
+    if (!directionsRenderer) return;
+
+    // Determine data source - preview data or Redux store
+    const routeOrigin = previewData ? 
+      { name: previewData.origin, lat: 0, lng: 0 } : // Will be resolved from Redux
+      origin;
+    const routeDestination = previewData ? 
+      { name: previewData.destination, lat: 0, lng: 0 } : // Will be resolved from Redux  
+      destination;
+    const routeStops = previewData ? previewData.stops : stops;
+
+    // For preview mode, use Redux data if available since preview only has names
+    const actualOrigin = previewData ? origin : routeOrigin;
+    const actualDestination = previewData ? destination : routeDestination;
+    const actualStops = previewData ? stops : routeStops;
+
+    if (!actualOrigin || !actualDestination) return;
 
     const directionsService = new google.maps.DirectionsService();
 
     // Prepare waypoints from stops
-    const waypoints = stops.map(stop => ({
+    const waypoints = actualStops.map(stop => ({
       location: { lat: stop.lat, lng: stop.lng },
       stopover: true,
     }));
@@ -46,8 +77,8 @@ const RouteDisplay: React.FC = () => {
     // Request directions
     directionsService.route(
       {
-        origin: { lat: origin.lat, lng: origin.lng },
-        destination: { lat: destination.lat, lng: destination.lng },
+        origin: { lat: actualOrigin.lat, lng: actualOrigin.lng },
+        destination: { lat: actualDestination.lat, lng: actualDestination.lng },
         waypoints: waypoints,
         travelMode: google.maps.TravelMode.DRIVING,
         optimizeWaypoints: false, // Keep the order of stops as specified
@@ -66,33 +97,38 @@ const RouteDisplay: React.FC = () => {
             totalDuration += leg.duration?.value || 0;
           });
           
-          setRouteInfo({
+          const routeInfo = {
             distance: (totalDistance / 1000).toFixed(1) + ' km',
             duration: Math.round(totalDuration / 60) + ' min'
-          });
+          };
           
-          // Dispatch to Redux
-          dispatch(setRouteInfo({
-            distance: (totalDistance / 1000).toFixed(1) + ' km',
-            duration: Math.round(totalDuration / 60) + ' min'
-          }));
+          // Only dispatch to Redux if not in preview mode
+          if (!previewData) {
+            dispatch(setRouteInfo(routeInfo));
+          }
         } else {
           console.error('Directions request failed due to ' + status);
-          setRouteInfo(null);
-          dispatch(setRouteInfo(null));
+          if (!previewData) {
+            dispatch(setRouteInfo(null));
+          }
         }
       }
     );
-  }, [directionsRenderer, origin, destination, stops]);
+  }, [directionsRenderer, origin, destination, stops, previewData, dispatch]);
+
+  // Always use Redux store data for markers since it contains coordinates
+  const displayOrigin = origin;
+  const displayDestination = destination;
+  const displayStops = stops;
 
   // Render custom markers with enhanced info windows
   return (
     <>
       {/* Origin marker */}
-      {origin && (
+      {displayOrigin && (
         <Marker
-          position={{ lat: origin.lat, lng: origin.lng }}
-          title={`🚩 START: ${origin.name}`}
+          position={{ lat: displayOrigin.lat, lng: displayOrigin.lng }}
+          title={`🚩 START: ${displayOrigin.name}`}
           icon={{
             url: 'data:image/svg+xml,' + encodeURIComponent(`
               <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
@@ -109,17 +145,17 @@ const RouteDisplay: React.FC = () => {
             const infoWindow = new google.maps.InfoWindow({
               content: MarkerTooltip({
                 type: 'origin',
-                name: origin.name,
-                address: origin.address
+                name: displayOrigin.name,
+                address: displayOrigin.address
               })
             });
-            infoWindow.open(map, { target: { lat: origin.lat, lng: origin.lng } } as any);
+            infoWindow.open(map);
           }}
         />
       )}
 
       {/* Stop markers */}
-      {stops.map((stop, index) => (
+      {displayStops.map((stop, index) => (
         <Marker
           key={stop.id}
           position={{ lat: stop.lat, lng: stop.lng }}
@@ -145,16 +181,16 @@ const RouteDisplay: React.FC = () => {
                 index: index + 1
               })
             });
-            infoWindow.open(map, { target: { lat: stop.lat, lng: stop.lng } } as any);
+            infoWindow.open(map);
           }}
         />
       ))}
 
       {/* Destination marker */}
-      {destination && (
+      {displayDestination && (
         <Marker
-          position={{ lat: destination.lat, lng: destination.lng }}
-          title={`🏁 END: ${destination.name}`}
+          position={{ lat: displayDestination.lat, lng: displayDestination.lng }}
+          title={`🏁 END: ${displayDestination.name}`}
           icon={{
             url: 'data:image/svg+xml,' + encodeURIComponent(`
               <svg width="44" height="54" viewBox="0 0 44 54" xmlns="http://www.w3.org/2000/svg">
@@ -171,11 +207,11 @@ const RouteDisplay: React.FC = () => {
             const infoWindow = new google.maps.InfoWindow({
               content: MarkerTooltip({
                 type: 'destination',
-                name: destination.name,
-                address: destination.address
+                name: displayDestination.name,
+                address: displayDestination.address
               })
             });
-            infoWindow.open(map, { target: { lat: destination.lat, lng: destination.lng } } as any);
+            infoWindow.open(map);
           }}
         />
       )}
