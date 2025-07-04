@@ -19,11 +19,12 @@ type SignedDetails struct {
 	jwt.StandardClaims
 }
 type OTPRecord struct {
-	Email     string        `bson:"email" json:"email"`
-	OTP       string        `bson:"otp" json:"otp"`
-	ExpiresAt time.Time     `bson:"expires_at" json:"expires_at"`
-	SignupReq SignupRequest `bson:"signup_req" json:"signup_req"`
-	Password  string        `bson:"password" json:"password"`
+	Email     string         `bson:"email" json:"email"`
+	OTP       string         `bson:"otp" json:"otp"`
+	ExpiresAt time.Time      `bson:"expires_at" json:"expires_at"`
+	Type      string         `bson:"type" json:"type"` // "signup" or "reset"
+	SignupReq *SignupRequest `bson:"signup_req,omitempty" json:"signup_req,omitempty"` // Only for signup
+	Password  string         `bson:"password,omitempty" json:"password,omitempty"` // Only for signup
 }
 
 type UserData struct {

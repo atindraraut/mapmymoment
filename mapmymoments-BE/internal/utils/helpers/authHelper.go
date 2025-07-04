@@ -68,7 +68,7 @@ func SendEmailOTP(email, otp string) error {
 		Region: aws.String("us-east-1"), // Replace with your AWS region
 	})
 	if err != nil {
-		slog.Error("Failed to create AWS session", err)
+		slog.Error("Failed to create AWS session", "error", err.Error())
 		return err
 	}
 
@@ -133,7 +133,7 @@ func SendEmailOTP(email, otp string) error {
 
 	_, err = svc.SendEmail(input)
 	if err != nil {
-		slog.Error("Failed to send email", err)
+		slog.Error("Failed to send email", "error", err.Error())
 		return err
 	}
 
@@ -147,7 +147,7 @@ func SendResetPasswordEmail(email, otp string) error {
 		Region: aws.String("us-east-1"),
 	})
 	if err != nil {
-		slog.Error("Failed to create AWS session", err)
+		slog.Error("Failed to create AWS session", "error", err.Error())
 		return err
 	}
 
@@ -212,7 +212,7 @@ func SendResetPasswordEmail(email, otp string) error {
 
 	_, err = svc.SendEmail(input)
 	if err != nil {
-		slog.Error("Failed to send reset password email", err)
+		slog.Error("Failed to send reset password email", "error", err.Error())
 		return err
 	}
 

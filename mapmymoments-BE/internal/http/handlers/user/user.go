@@ -37,7 +37,8 @@ func signup(storage storage.Storage) http.HandlerFunc {
 			Email:     req.Email,
 			OTP:       otp,
 			ExpiresAt: time.Now().Add(10 * time.Minute),
-			SignupReq: req,
+			Type:      "signup",
+			SignupReq: &req,
 			Password:  hashedPassword,
 		}
 		err = storage.SaveOTPRecord(otpRecord)
@@ -96,8 +97,16 @@ func verifyOTP(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("OTP expired or not found")))
 			return
 		}
+		if record.Type != "signup" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("invalid OTP type for signup verification")))
+			return
+		}
 		if record.OTP != req.OTP {
 			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("invalid OTP")))
+			return
+		}
+		if record.SignupReq == nil {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("invalid signup data in OTP record")))
 			return
 		}
 		user := types.UserData{
@@ -192,6 +201,7 @@ func requestPasswordReset(storage storage.Storage) http.HandlerFunc {
 			Email:     req.Email,
 			OTP:       otp,
 			ExpiresAt: time.Now().Add(10 * time.Minute),
+			Type:      "reset",
 		}
 		err = storage.SaveOTPRecord(otpRecord)
 		if err != nil {
@@ -218,6 +228,10 @@ func resetPassword(storage storage.Storage) http.HandlerFunc {
 		record, err := storage.GetOTPRecordByEmail(req.Email)
 		if err != nil || record.Email == "" || record.ExpiresAt.Before(time.Now()) {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("OTP expired or not found")))
+			return
+		}
+		if record.Type != "reset" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("invalid OTP type for password reset")))
 			return
 		}
 		if record.OTP != req.OTP {
