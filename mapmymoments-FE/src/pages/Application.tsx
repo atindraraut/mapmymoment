@@ -4,6 +4,7 @@ import { Provider, useSelector } from 'react-redux';
 import { APIProvider, Map, Marker } from '@vis.gl/react-google-maps';
 
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import store, { RootState } from '@/store';
 import { cn } from '@/lib/utils';
 
@@ -250,6 +251,18 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
   onUnlinkGoogle,
 }) => {
   const routeData = useSelector((state: RootState) => state.route);
+  const { location, loading: locationLoading, isUserLocation, error } = useGeolocation();
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+
+  // Update map center when location changes and map is ready
+  useEffect(() => {
+    console.log('Location update:', { location, locationLoading, isUserLocation, error });
+    if (!locationLoading && mapInstance && isUserLocation) {
+      console.log('Updating map center to user location:', location);
+      mapInstance.setCenter(location);
+      mapInstance.setZoom(15);
+    }
+  }, [location, locationLoading, isUserLocation, mapInstance, error]);
 
   // Tab content mapping as a function to access latest props
   const renderTabContent = () => {
@@ -280,26 +293,58 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
     <div className="min-h-screen w-full">
       <APIProvider apiKey={"AIzaSyDPRWyEVasy7zo_MvEU67Ijwrv4af1R-7E"}>
         <div className="relative" style={{ touchAction: 'auto' }}>
-          <Map
-            defaultCenter={{ lat: 12.9716, lng: 77.5946 }}
-            defaultZoom={12}
-            gestureHandling={'greedy'}
-            disableDefaultUI={true}
-            scrollwheel={true}
-            draggable={true}
-            panControl={true}
-            rotateControl={true}
-            scaleControl={true}
-            streetViewControl={false}
-            zoomControl={true}
-            keyboardShortcuts={true}
-            className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
-            style={{ touchAction: 'auto' }}
-          >
-            {/* Display route from Redux or preview */}
-            {activeTab === 'route' && <RouteDisplay />}
-            {activeTab === 'plan' && <RouteDisplay previewData={routePreview} />}
-          </Map>
+          {locationLoading && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-white px-4 py-2 rounded-lg shadow-md">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="text-sm">Getting your approximate location...</span>
+              </div>
+            </div>
+          )}
+          {!locationLoading && (
+            <Map
+              defaultCenter={location}
+              defaultZoom={isUserLocation ? 10 : 12}
+              gestureHandling={'greedy'}
+              disableDefaultUI={true}
+              scrollwheel={true}
+              draggable={true}
+              panControl={true}
+              rotateControl={true}
+              scaleControl={true}
+              streetViewControl={false}
+              zoomControl={true}
+              keyboardShortcuts={true}
+              className="w-full h-screen lg:pl-20 pb-16 lg:pb-0"
+              style={{ touchAction: 'auto' }}
+              onLoad={(map) => {
+                console.log('Map loaded:', map);
+                setMapInstance(map);
+              }}
+            >
+              {/* Display route from Redux or preview */}
+              {activeTab === 'route' && <RouteDisplay />}
+              {activeTab === 'plan' && <RouteDisplay previewData={routePreview} />}
+              
+              {/* User location marker - only show if we have the user's actual location */}
+              {isUserLocation && (
+                <Marker
+                  position={location}
+                  title="Your Location"
+                  icon={{
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="8" fill="#2563eb" stroke="#ffffff" stroke-width="2"/>
+                        <circle cx="12" cy="12" r="4" fill="#ffffff"/>
+                      </svg>
+                    `),
+                    scaledSize: new google.maps.Size(24, 24),
+                    anchor: new google.maps.Point(12, 12),
+                  }}
+                />
+              )}
+            </Map>
+          )}
           <MapSidebar
             tabs={TAB_CONFIG}
             activeTab={activeTab}
