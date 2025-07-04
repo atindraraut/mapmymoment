@@ -24,3 +24,6 @@ storage.db
 
 # env file
 .env
+
+# ignoring bin as it contains built binaries
+/bin

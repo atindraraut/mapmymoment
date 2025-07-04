@@ -33,3 +33,14 @@ help:
 	@echo "  clean - Clean up build artifacts"
 	@echo "  test  - Run tests"
 	@echo "  help  - Show this help message"
+
+.PHONY: build-sam
+build-sam:
+	@echo "Building all lambda functions for AWS SAM..."
+	GOOS=linux GOARCH=amd64 go build -o bin/hello cmd/lambda-api/hello/main.go
+	GOOS=linux GOARCH=amd64 go build -o bin/s3_hello cmd/lambda-api/s3_hello/main.go
+
+.PHONY: sam-local
+sam-local: build-sam
+	@echo "Running AWS SAM local API on port 4000..."
+	sam local start-api -t template.yaml --port 4000

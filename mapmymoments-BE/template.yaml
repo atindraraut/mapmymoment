@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AWS SAM template for mapmymoments-lambda
+
+Globals:
+  Function:
+    Runtime: go1.x
+    Timeout: 30
+    MemorySize: 128
+
+Resources:
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: hello
+      Handler: bin/hello
+      CodeUri: .
+      Events:
+        HelloApi:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: get
+
+  S3HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: s3hello
+      Handler: bin/s3_hello
+      CodeUri: .
+      Events:
+        S3PutEvent:
+          Type: S3
+          Properties:
+            Bucket: your-bucket-name
+            Events: s3:ObjectCreated:Put
+
+Outputs:
+  HelloApi:
+    Description: "API Gateway endpoint URL for Prod stage for Hello function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
