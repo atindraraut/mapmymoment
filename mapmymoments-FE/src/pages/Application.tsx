@@ -327,6 +327,9 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
               lastName={userData.lastName}
               email={userData.email}
               onLogout={handleLogout}
+              authInfo={authInfo}
+              onLinkGoogle={onLinkGoogle}
+              onUnlinkGoogle={onUnlinkGoogle}
             />
           </div>
         </div>
