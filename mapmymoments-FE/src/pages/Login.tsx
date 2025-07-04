@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from "@/lib/api";
+import { GoogleOAuthButton } from "@/components/GoogleOAuthButton";
 
 
 const Login = () => {
@@ -52,6 +53,22 @@ const Login = () => {
     }
   };
 
+  const handleOAuthSuccess = (tokens: {
+    access_token: string;
+    refresh_token: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+  }) => {
+    console.log('OAuth login successful:', tokens);
+    navigate('/app');
+  };
+
+  const handleOAuthError = (error: string) => {
+    console.error('OAuth login failed:', error);
+    setError(error);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-cover bg-center" style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1500673922987-e212871fec22?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80")' }}>
       <div className="absolute inset-0 hero-gradient z-0"></div>
@@ -74,6 +91,25 @@ const Login = () => {
               </div>
               <Button className="w-full bg-primary text-white hover:bg-primary/90 py-2 text-lg rounded" disabled={loading}>{loading ? 'Logging In...' : 'Log In'}</Button>
             </form>
+            
+            <div className="mt-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+              <div className="mt-4">
+                <GoogleOAuthButton
+                  onSuccess={handleOAuthSuccess}
+                  onError={handleOAuthError}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+            
             <p className="mt-6 text-center text-sm text-foreground/80">
               <Link to="/" className="text-primary hover:underline mr-4">Home</Link>
               <span>|</span>

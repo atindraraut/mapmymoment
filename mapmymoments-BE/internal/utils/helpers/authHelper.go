@@ -1,9 +1,15 @@
 package auth
 
 import (
+	"context"
+	cryptoRand "crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
@@ -12,6 +18,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 var SECRET_KEY string = os.Getenv("SECRET_KEY")
@@ -222,4 +230,61 @@ func SendResetPasswordEmail(email, otp string) error {
 
 func GenerateOTP() string {
 	return fmt.Sprintf("%06d", rand.Intn(1000000))
+}
+
+
+// OAuth configuration - will be initialized with config values
+var googleOAuthConfig *oauth2.Config
+
+// InitOAuthConfig initializes OAuth configuration with config values
+func InitOAuthConfig(clientID, clientSecret, redirectURL string) {
+	googleOAuthConfig = &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		Scopes:       []string{"email", "profile"},
+		Endpoint:     google.Endpoint,
+	}
+}
+
+// GenerateGoogleOAuthURL generates Google OAuth authorization URL
+func GenerateGoogleOAuthURL(state string) string {
+	return googleOAuthConfig.AuthCodeURL(state)
+}
+
+// GenerateRandomState generates a random state for OAuth flow
+func GenerateRandomState() (string, error) {
+	b := make([]byte, 16)
+	_, err := cryptoRand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// ExchangeCodeForTokens exchanges authorization code for access token
+func ExchangeCodeForTokens(code string) (*oauth2.Token, error) {
+	return googleOAuthConfig.Exchange(context.Background(), code)
+}
+
+// GetGoogleUserInfo retrieves user info from Google API
+func GetGoogleUserInfo(token *oauth2.Token) (*types.GoogleUserInfo, error) {
+	client := googleOAuthConfig.Client(context.Background(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v1/userinfo")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to get user info from Google")
+	}
+
+	var userInfo types.GoogleUserInfo
+	err = json.NewDecoder(resp.Body).Decode(&userInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &userInfo, nil
 }

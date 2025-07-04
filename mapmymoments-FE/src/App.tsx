@@ -15,6 +15,7 @@ import MapLoader from '@/components/MapLoader';
 import RouteDetails from "./pages/RouteDetails";
 import RequestReset from './pages/RequestReset';
 import ResetPassword from './pages/ResetPassword';
+import { OAuthCallback } from './pages/OAuthCallback';
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => {
               <Route path="/route/:id" element={<Suspense fallback={<MapLoader />}><RouteDetails /></Suspense>} />
               <Route path="/request-reset" element={<RequestReset />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/oauth/callback" element={<OAuthCallback />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

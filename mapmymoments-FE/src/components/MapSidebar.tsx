@@ -20,9 +20,13 @@ interface MapSidebarProps {
   // Profile state management
   isProfileOpen: boolean;
   onProfileToggle: (isOpen: boolean) => void;
+  // Google account linking
+  isGoogleLinked?: boolean;
+  onLinkGoogle?: () => void;
+  onUnlinkGoogle?: () => void;
 }
 
-const MapSidebar = ({ tabs, activeTab, onTabChange, firstName = '', lastName = '', email = '', onLogout, isProfileOpen, onProfileToggle }: MapSidebarProps) => {
+const MapSidebar = ({ tabs, activeTab, onTabChange, firstName = '', lastName = '', email = '', onLogout, isProfileOpen, onProfileToggle, isGoogleLinked = false, onLinkGoogle, onUnlinkGoogle }: MapSidebarProps) => {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || '?';
 
   // Function to handle tab changes and ensure profile is closed
@@ -101,6 +105,9 @@ const MapSidebar = ({ tabs, activeTab, onTabChange, firstName = '', lastName = '
         lastName={lastName}
         email={email}
         onLogout={onLogout}
+        isGoogleLinked={isGoogleLinked}
+        onLinkGoogle={onLinkGoogle}
+        onUnlinkGoogle={onUnlinkGoogle}
       />
     </nav>
   );

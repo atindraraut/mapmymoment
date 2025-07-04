@@ -279,3 +279,107 @@ export async function deleteRoute(routeId: string): Promise<void> {
     throw new Error('Failed to delete route');
   }
 }
+
+// OAuth API Types
+export interface GoogleOAuthUrlResponse {
+  auth_url: string;
+  state: string;
+}
+
+export interface GoogleOAuthCallbackRequest {
+  code: string;
+  state: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+
+/**
+ * Get Google OAuth authorization URL
+ * 
+ * @returns Google OAuth URL and state
+ */
+export async function getGoogleOAuthUrl(): Promise<GoogleOAuthUrlResponse> {
+  const response = await apiFetch('/user/oauth/google/url', {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get OAuth URL');
+  }
+
+  return response.json();
+}
+
+/**
+ * Exchange OAuth authorization code for tokens
+ * 
+ * @param code - Authorization code from Google
+ * @param state - State parameter for CSRF protection
+ * @returns Access token, refresh token, and user info
+ */
+export async function exchangeOAuthCode(code: string, state: string): Promise<AuthTokenResponse> {
+  const response = await apiFetch('/user/oauth/google/callback', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code, state }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Failed to exchange OAuth code');
+  }
+
+  return response.json();
+}
+
+export interface UserAuthInfo {
+  email: string;
+  first_name: string;
+  last_name: string;
+  auth_type: string;
+  has_password: boolean;
+  has_google: boolean;
+}
+
+/**
+ * Get user authentication information
+ * 
+ * @returns User auth info including linked accounts
+ */
+export async function getUserAuthInfo(): Promise<UserAuthInfo> {
+  const response = await apiFetch('/user/auth-info', {
+    method: 'GET',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get user auth info');
+  }
+
+  return response.json();
+}
+
+/**
+ * Unlink Google account from current user
+ * 
+ * @returns Success message
+ */
+export async function unlinkGoogleAccount(): Promise<{ message: string }> {
+  const response = await apiFetch('/user/unlink-google', {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Failed to unlink Google account');
+  }
+
+  return response.json();
+}

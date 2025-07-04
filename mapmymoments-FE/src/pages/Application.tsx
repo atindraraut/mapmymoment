@@ -14,6 +14,10 @@ import RouteDisplay from '@/components/RouteDisplay';
 import ReduxDebugger from '@/components/ReduxDebugger';
 import { useRouteActions } from '@/hooks/useRouteActions';
 import RouteGrid from '@/components/RouteGrid';
+import { LinkGoogleAccount } from '@/components/LinkGoogleAccount';
+import { UnlinkGoogleConfirm } from '@/components/UnlinkGoogleConfirm';
+import { getUserAuthInfo, unlinkGoogleAccount, UserAuthInfo } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface RoutePoint {
   origin: string;
@@ -29,12 +33,17 @@ interface RoutePoint {
 const Application = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   useAuthGuard();
   const [activeTab, setActiveTab] = useState<'plan' | 'route'>(
     location.state?.tab === 'route' ? 'route' : 'plan'
   );
   const [routePreview, setRoutePreview] = useState<RoutePoint | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLinkGoogleOpen, setIsLinkGoogleOpen] = useState(false);
+  const [isUnlinkConfirmOpen, setIsUnlinkConfirmOpen] = useState(false);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+  const [authInfo, setAuthInfo] = useState<UserAuthInfo | null>(null);
   
   const [userData, setUserData] = useState({
     firstName: localStorage.getItem('first_name') || '',
@@ -65,9 +74,91 @@ const Application = () => {
     }
   };
 
+  // Fetch user auth info on component mount
+  useEffect(() => {
+    const fetchAuthInfo = async () => {
+      try {
+        const info = await getUserAuthInfo();
+        setAuthInfo(info);
+      } catch (error) {
+        console.error('Failed to fetch auth info:', error);
+      }
+    };
+    fetchAuthInfo();
+  }, []);
+
   useEffect(() => {
     if (location.state?.tab === 'route') setActiveTab('route');
   }, [location.state]);
+
+  const handleLinkGoogle = () => {
+    setIsLinkGoogleOpen(true);
+  };
+
+  const handleUnlinkGoogle = () => {
+    setIsUnlinkConfirmOpen(true);
+  };
+
+  const handleUnlinkConfirm = async () => {
+    setIsUnlinking(true);
+    try {
+      await unlinkGoogleAccount();
+      // Refresh auth info
+      const updatedInfo = await getUserAuthInfo();
+      setAuthInfo(updatedInfo);
+      toast({
+        title: "✅ Google Account Unlinked",
+        description: "Your Google account has been successfully unlinked from your profile.",
+      });
+      setIsUnlinkConfirmOpen(false);
+    } catch (error) {
+      console.error('Failed to unlink Google account:', error);
+      toast({
+        title: "❌ Failed to Unlink Google Account",
+        description: error instanceof Error ? error.message : "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUnlinking(false);
+    }
+  };
+
+  const handleUnlinkCancel = () => {
+    setIsUnlinkConfirmOpen(false);
+  };
+
+  const handleLinkSuccess = async () => {
+    setIsLinkGoogleOpen(false);
+    // Refresh auth info
+    try {
+      const updatedInfo = await getUserAuthInfo();
+      setAuthInfo(updatedInfo);
+      toast({
+        title: "🔗 Google Account Linked",
+        description: "Your Google account has been successfully linked! You can now sign in with either method.",
+      });
+    } catch (error) {
+      console.error('Failed to refresh auth info:', error);
+      toast({
+        title: "⚠️ Account Linked but Info Not Refreshed",
+        description: "Please refresh the page to see updated account status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLinkError = (error: string) => {
+    console.error('Google linking failed:', error);
+    toast({
+      title: "❌ Failed to Link Google Account",
+      description: error || "An unexpected error occurred. Please try again.",
+      variant: "destructive",
+    });
+  };
+
+  const handleLinkCancel = () => {
+    setIsLinkGoogleOpen(false);
+  };
 
   return (
     <Provider store={store}>
@@ -80,6 +171,23 @@ const Application = () => {
         userData={userData}
         handleLogout={handleLogout}
         handlePreviewRoute={handlePreviewRoute}
+        authInfo={authInfo}
+        onLinkGoogle={handleLinkGoogle}
+        onUnlinkGoogle={handleUnlinkGoogle}
+      />
+      
+      <LinkGoogleAccount
+        isOpen={isLinkGoogleOpen}
+        onSuccess={handleLinkSuccess}
+        onError={handleLinkError}
+        onCancel={handleLinkCancel}
+      />
+      
+      <UnlinkGoogleConfirm
+        isOpen={isUnlinkConfirmOpen}
+        onConfirm={handleUnlinkConfirm}
+        onCancel={handleUnlinkCancel}
+        isLoading={isUnlinking}
       />
     </Provider>
   );
@@ -94,6 +202,9 @@ interface ApplicationContentProps {
   userData: { firstName: string; lastName: string; email: string };
   handleLogout: () => void;
   handlePreviewRoute: (points: RoutePoint) => void;
+  authInfo: UserAuthInfo | null;
+  onLinkGoogle: () => void;
+  onUnlinkGoogle: () => void;
 }
 
 const TAB_CONFIG: SidebarTabConfig[] = [
@@ -128,6 +239,9 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
   userData,
   handleLogout,
   handlePreviewRoute,
+  authInfo,
+  onLinkGoogle,
+  onUnlinkGoogle,
 }) => {
   const routeData = useSelector((state: RootState) => state.route);
 
@@ -195,6 +309,9 @@ const ApplicationContent: React.FC<ApplicationContentProps> = ({
             onLogout={handleLogout}
             isProfileOpen={isProfileOpen}
             onProfileToggle={setIsProfileOpen}
+            isGoogleLinked={authInfo?.has_google || false}
+            onLinkGoogle={onLinkGoogle}
+            onUnlinkGoogle={onUnlinkGoogle}
           />
           {/* Render tab content outside sidebar for scalability */}
           <div className="absolute left-0 right-0 bottom-16 lg:bottom-auto lg:left-20 lg:top-0 lg:right-auto lg:w-[calc(100%-5rem)]">

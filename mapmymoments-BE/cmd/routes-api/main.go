@@ -14,6 +14,7 @@ import (
 	"github.com/atindraraut/crudgo/internal/http/handlers/public"
 	"github.com/atindraraut/crudgo/internal/http/handlers/routes"
 	"github.com/atindraraut/crudgo/internal/http/handlers/user"
+	auth "github.com/atindraraut/crudgo/internal/utils/helpers"
 	"github.com/atindraraut/crudgo/internal/utils/middleware"
 	"github.com/atindraraut/crudgo/storage/mongodb"
 )
@@ -21,6 +22,8 @@ import (
 func main() {
 	//load config
 	cfg := config.MustLoadConfig()
+	//initialize OAuth configuration
+	auth.InitOAuthConfig(cfg.OAuthClientID, cfg.OAuthSecret, cfg.OAuthRedirectURL)
 	//database setup
 	storage, err := mongodb.New(cfg)
 	if err != nil {

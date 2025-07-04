@@ -3,12 +3,14 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/atindraraut/crudgo/internal/types"
 	auth "github.com/atindraraut/crudgo/internal/utils/helpers"
+	"github.com/atindraraut/crudgo/internal/utils/middleware"
 	"github.com/atindraraut/crudgo/internal/utils/response"
 	"github.com/atindraraut/crudgo/storage"
 	"github.com/go-playground/validator/v10"
@@ -111,9 +113,11 @@ func verifyOTP(storage storage.Storage) http.HandlerFunc {
 		}
 		user := types.UserData{
 			Email:     record.SignupReq.Email,
-			Password:  record.Password,
+			Password:  &record.Password,
 			FirstName: record.SignupReq.FirstName,
 			LastName:  record.SignupReq.LastName,
+			GoogleID:  nil,
+			AuthType:  "email",
 		}
 		if _, err := storage.CreateUser(user); err != nil {
 			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
@@ -139,7 +143,7 @@ func login(storage storage.Storage) http.HandlerFunc {
 			return
 		}
 		user, err := storage.GetUserByEmail(req.Email)
-		if err != nil || !checkPasswordHash(req.Password, user.Password) {
+		if err != nil || user.Password == nil || !checkPasswordHash(req.Password, *user.Password) {
 			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("invalid credentials")))
 			return
 		}
@@ -248,7 +252,7 @@ func resetPassword(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("user not found")))
 			return
 		}
-		user.Password = hashedPassword
+		user.Password = &hashedPassword
 		if err := storage.UpdateUserPassword(user.Email, hashedPassword); err != nil {
 			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to update password")))
 			return
@@ -267,4 +271,147 @@ func hashPassword(password string) (string, error) {
 // Helper: compare password
 func checkPasswordHash(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+// Google OAuth URL handler
+func googleOAuthURL(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		state, err := auth.GenerateRandomState()
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to generate state")))
+			return
+		}
+		
+		url := auth.GenerateGoogleOAuthURL(state)
+		// Debug logging
+		fmt.Printf("Generated OAuth URL: %s\n", url)
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"auth_url": url,
+			"state":    state,
+		})
+	}
+}
+
+// Google OAuth callback handler
+func googleOAuthCallback(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req types.GoogleOAuthRequest
+		if err := decodeAndValidate(r, &req); err != nil {
+			writeValidationError(w, err)
+			return
+		}
+
+		// Exchange authorization code for access token
+		token, err := auth.ExchangeCodeForTokens(req.Code)
+		if err != nil {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("failed to exchange code for token")))
+			return
+		}
+
+		// Get user information from Google
+		userInfo, err := auth.GetGoogleUserInfo(token)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to get user info")))
+			return
+		}
+
+		// Create or update user in database
+		user := types.UserData{
+			Email:     userInfo.Email,
+			Password:  nil, // OAuth users don't have passwords
+			FirstName: userInfo.GivenName,
+			LastName:  userInfo.FamilyName,
+			GoogleID:  &userInfo.ID,
+			AuthType:  "google",
+		}
+
+		// Check if user exists with email but no Google ID (account linking)
+		existingUser, err := storage.GetUserByEmail(user.Email)
+		if err == nil && existingUser.Email != "" {
+			// User exists, update auth type to "both"
+			user.AuthType = "both"
+		}
+
+		_, err = storage.CreateOrUpdateGoogleUser(user)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to create or update user")))
+			return
+		}
+
+		// Generate JWT tokens
+		accessToken, refreshToken, err := auth.GenerateAllTokens(user.Email, user.FirstName, user.LastName, user.Email)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to generate tokens")))
+			return
+		}
+
+		response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"access_token":  accessToken,
+			"refresh_token": refreshToken,
+			"email":         user.Email,
+			"first_name":    user.FirstName,
+			"last_name":     user.LastName,
+		})
+	}
+}
+
+// Get user auth info handler
+func getUserAuthInfo(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get user from auth middleware context
+		authUser := middleware.GetAuthUser(r)
+		if authUser == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("user not authenticated")))
+			return
+		}
+		
+		user, err := storage.GetUserByEmail(authUser.Email)
+		if err != nil || user.Email == "" {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("user not found")))
+			return
+		}
+
+		response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"email":           user.Email,
+			"first_name":      user.FirstName,
+			"last_name":       user.LastName,
+			"auth_type":       user.AuthType,
+			"has_password":    user.Password != nil,
+			"has_google":      user.GoogleID != nil,
+		})
+	}
+}
+
+// Unlink Google account handler
+func unlinkGoogleAccount(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get user from auth middleware context
+		authUser := middleware.GetAuthUser(r)
+		if authUser == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("user not authenticated")))
+			return
+		}
+		
+		user, err := storage.GetUserByEmail(authUser.Email)
+		if err != nil || user.Email == "" {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("user not found")))
+			return
+		}
+
+		// Check if user has a password - cannot unlink Google if it's the only auth method
+		if user.Password == nil {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("cannot unlink Google account: please set a password first")))
+			return
+		}
+
+		// Unlink Google account
+		if err := storage.UnlinkGoogleAccount(user.Email); err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(errors.New("failed to unlink Google account")))
+			return
+		}
+
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"message": "Google account unlinked successfully",
+		})
+	}
 }

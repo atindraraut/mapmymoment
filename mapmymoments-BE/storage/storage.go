@@ -15,4 +15,8 @@ type Storage interface {
 	UpdateRoute(id string, route interface{}) (string, error)
 	DeleteRoute(id string) (string, error)
 	UpdateUserPassword(email, hashedPassword string) error
+	// OAuth methods
+	GetUserByGoogleID(googleID string) (types.UserData, error)
+	CreateOrUpdateGoogleUser(user types.UserData) (int64, error)
+	UnlinkGoogleAccount(email string) error
 }

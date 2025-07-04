@@ -29,9 +29,11 @@ type OTPRecord struct {
 
 type UserData struct {
 	Email     string
-	Password  string // In production, store hashed password!
+	Password  *string // Optional - nil for OAuth-only users
 	FirstName string
 	LastName  string
+	GoogleID  *string // Optional - for Google OAuth users
+	AuthType  string  // "email", "google", or "both"
 }
 
 type SignupRequest struct {
@@ -48,4 +50,19 @@ type LoginRequest struct {
 
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+type GoogleOAuthRequest struct {
+	Code  string `json:"code" validate:"required"`
+	State string `json:"state" validate:"required"`
+}
+
+type GoogleUserInfo struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	VerifiedEmail bool   `json:"verified_email"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Picture       string `json:"picture"`
 }
