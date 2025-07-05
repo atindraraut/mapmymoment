@@ -22,4 +22,14 @@ func RegisterRoutes(router *http.ServeMux, storage storage.Storage) {
 
 	// S3 signed URL endpoint for image upload
 	router.Handle("POST /api/routes/{id}/generate-upload-urls", middleware.WithMiddleware(GenerateS3UploadUrlsHandler(storage), middleware.AuthMiddleware(storage)))
+
+	// Route sharing endpoints
+	router.Handle("POST /api/routes/{id}/share", middleware.WithMiddleware(ShareRoute(storage), middleware.AuthMiddleware(storage)))
+	router.Handle("GET /api/routes/{id}/share-info", middleware.WithMiddleware(GetRouteShareInfo(storage), middleware.AuthMiddleware(storage)))
+	router.Handle("DELETE /api/routes/{id}/share", middleware.WithMiddleware(RevokeRouteShare(storage), middleware.AuthMiddleware(storage)))
+	
+	// Shared routes endpoints
+	router.Handle("GET /api/shared-routes/{token}", GetSharedRouteByToken(storage)) // Public - no auth required
+	router.Handle("POST /api/shared-routes/{token}/join", middleware.WithMiddleware(JoinSharedRoute(storage), middleware.AuthMiddleware(storage)))
+	router.Handle("GET /api/my-shared-routes", middleware.WithMiddleware(GetSharedRoutesForUser(storage), middleware.AuthMiddleware(storage)))
 }

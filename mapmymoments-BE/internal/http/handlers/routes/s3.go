@@ -45,6 +45,18 @@ func GenerateS3UploadUrlsHandler(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("route id required")))
 			return
 		}
+		
+		// Check if user has permission to upload photos to this route
+		permission, err := storage.CheckUserRoutePermission(user.Email, routeId)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		if permission != "owner" && permission != "upload" {
+			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("you don't have permission to upload photos to this route")))
+			return
+		}
 		var req GenerateS3UrlsRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(err))

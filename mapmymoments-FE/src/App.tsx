@@ -16,6 +16,7 @@ import RouteDetails from "./pages/RouteDetails";
 import RequestReset from './pages/RequestReset';
 import ResetPassword from './pages/ResetPassword';
 import { OAuthCallback } from './pages/OAuthCallback';
+import JoinSharedRoute from './pages/JoinSharedRoute';
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => {
               <Route path="/request-reset" element={<RequestReset />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/oauth/callback" element={<OAuthCallback />} />
+              <Route path="/shared-routes/:token" element={<Suspense fallback={<MapLoader />}><JoinSharedRoute /></Suspense>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

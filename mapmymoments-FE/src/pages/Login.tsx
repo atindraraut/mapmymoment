@@ -42,7 +42,20 @@ const Login = () => {
         localStorage.setItem('email', data.email);
         localStorage.setItem('first_name', data.first_name);
         localStorage.setItem('last_name', data.last_name);
-        navigate('/app');
+        
+        // Check if there's a pending shared route token
+        const pendingToken = localStorage.getItem('pendingSharedRouteToken');
+        const redirectPath = localStorage.getItem('redirectAfterLogin');
+        
+        if (pendingToken && redirectPath) {
+          // Clear the stored values
+          localStorage.removeItem('pendingSharedRouteToken');
+          localStorage.removeItem('redirectAfterLogin');
+          // Redirect back to the shared route page
+          navigate(redirectPath);
+        } else {
+          navigate('/app');
+        }
       } else {
         setError(data.message || 'Login failed');
       }
@@ -61,7 +74,20 @@ const Login = () => {
     last_name: string;
   }) => {
     console.log('OAuth login successful:', tokens);
-    navigate('/app');
+    
+    // Check if there's a pending shared route token
+    const pendingToken = localStorage.getItem('pendingSharedRouteToken');
+    const redirectPath = localStorage.getItem('redirectAfterLogin');
+    
+    if (pendingToken && redirectPath) {
+      // Clear the stored values
+      localStorage.removeItem('pendingSharedRouteToken');
+      localStorage.removeItem('redirectAfterLogin');
+      // Redirect back to the shared route page
+      navigate(redirectPath);
+    } else {
+      navigate('/app');
+    }
   };
 
   const handleOAuthError = (error: string) => {

@@ -19,4 +19,12 @@ type Storage interface {
 	GetUserByGoogleID(googleID string) (types.UserData, error)
 	CreateOrUpdateGoogleUser(user types.UserData) (int64, error)
 	UnlinkGoogleAccount(email string) error
+	// Route sharing methods
+	GenerateRouteShareToken(routeId string, expiryHours *int) (string, error)
+	GetRouteByShareToken(token string) (interface{}, error)
+	AddUserToSharedRoute(routeId, userId, email string) error
+	GetSharedRoutesForUser(userId string) ([]interface{}, error)
+	GetUsersByRouteId(routeId string) ([]types.UserData, error)
+	CheckUserRoutePermission(userId, routeId string) (string, error) // returns permission level or empty string
+	RevokeRouteShare(routeId string) error
 }

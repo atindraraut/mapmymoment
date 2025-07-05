@@ -95,23 +95,24 @@ func UpdateRoute(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("id is required")))
 			return
 		}
-		// Get the route from DB
-		existing, err := storage.GetRouteById(id)
-		if err != nil {
-			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("route not found")))
-			return
-		}
 		user := middleware.GetAuthUser(r)
 		if user == nil {
 			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
 			return
 		}
-		if existing.(types.Route).CreatorID != user.Email {
+		// Check user permission instead of just checking if they're the creator
+		permission, permErr := storage.CheckUserRoutePermission(user.Email, id)
+		if permErr != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(permErr))
+			return
+		}
+		
+		if permission != "owner" {
 			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("only the creator can edit this route")))
 			return
 		}
 		var route types.Route
-		err = json.NewDecoder(r.Body).Decode(&route)
+		err := json.NewDecoder(r.Body).Decode(&route)
 		if errors.Is(err, io.EOF) {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("request body is empty")))
 			return
@@ -148,17 +149,19 @@ func DeleteRoute(storage storage.Storage) http.HandlerFunc {
 			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("id is required")))
 			return
 		}
-		existing, err := storage.GetRouteById(id)
-		if err != nil {
-			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("route not found")))
-			return
-		}
 		user := middleware.GetAuthUser(r)
 		if user == nil {
 			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
 			return
 		}
-		if existing.(types.Route).CreatorID != user.Email {
+		// Check user permission instead of just checking if they're the creator
+		permission, permErr := storage.CheckUserRoutePermission(user.Email, id)
+		if permErr != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(permErr))
+			return
+		}
+		
+		if permission != "owner" {
 			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("only the creator can delete this route")))
 			return
 		}
@@ -195,5 +198,233 @@ func GetUserRoutes(storage storage.Storage) http.HandlerFunc {
 			}
 		}
 		response.WriteJSON(w, http.StatusOK, userRoutes)
+	}
+}
+
+// Route sharing handlers
+func ShareRoute(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if id == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("route id is required")))
+			return
+		}
+		
+		// Check if user is the creator
+		user := middleware.GetAuthUser(r)
+		if user == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
+			return
+		}
+		
+		existing, err := storage.GetRouteById(id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("route not found")))
+			return
+		}
+		
+		route := existing.(types.Route)
+		if route.CreatorID != user.Email {
+			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("only the creator can share this route")))
+			return
+		}
+		
+		// Parse request body for optional expiry
+		var req types.ShareRouteRequest
+		if r.Body != nil {
+			json.NewDecoder(r.Body).Decode(&req)
+		}
+		
+		// Generate share token
+		token, err := storage.GenerateRouteShareToken(id, req.ExpiryHours)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		// Calculate expiry time for response
+		var expiryTime *time.Time
+		if req.ExpiryHours != nil {
+			expiry := time.Now().Add(time.Duration(*req.ExpiryHours) * time.Hour)
+			expiryTime = &expiry
+		}
+		
+		resp := types.ShareRouteResponse{
+			ShareToken: token,
+			ExpiresAt:  expiryTime,
+		}
+		
+		response.WriteJSON(w, http.StatusOK, resp)
+	}
+}
+
+func GetRouteShareInfo(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if id == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("route id is required")))
+			return
+		}
+		
+		// Check if user has permission to view share info
+		user := middleware.GetAuthUser(r)
+		if user == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
+			return
+		}
+		
+		permission, err := storage.CheckUserRoutePermission(user.Email, id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		if permission != "owner" {
+			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("only the creator can view share info")))
+			return
+		}
+		
+		route, err := storage.GetRouteById(id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("route not found")))
+			return
+		}
+		
+		routeObj := route.(types.Route)
+		
+		// Get users who have access to this route
+		users, err := storage.GetUsersByRouteId(id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		shareInfo := map[string]interface{}{
+			"shareToken":   routeObj.ShareToken,
+			"expiresAt":    routeObj.ShareTokenExpiry,
+			"sharedWith":   routeObj.SharedWith,
+			"sharedUsers":  users,
+		}
+		
+		response.WriteJSON(w, http.StatusOK, shareInfo)
+	}
+}
+
+func RevokeRouteShare(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if id == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("route id is required")))
+			return
+		}
+		
+		// Check if user is the creator
+		user := middleware.GetAuthUser(r)
+		if user == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
+			return
+		}
+		
+		existing, err := storage.GetRouteById(id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(errors.New("route not found")))
+			return
+		}
+		
+		route := existing.(types.Route)
+		if route.CreatorID != user.Email {
+			response.WriteJSON(w, http.StatusForbidden, response.GeneralError(errors.New("only the creator can revoke sharing")))
+			return
+		}
+		
+		err = storage.RevokeRouteShare(id)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		response.WriteJSON(w, http.StatusOK, map[string]string{
+			"message": "Route sharing revoked successfully",
+		})
+	}
+}
+
+func GetSharedRouteByToken(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.PathValue("token")
+		if token == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("share token is required")))
+			return
+		}
+		
+		route, err := storage.GetRouteByShareToken(token)
+		if err != nil {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(err))
+			return
+		}
+		
+		response.WriteJSON(w, http.StatusOK, route)
+	}
+}
+
+func JoinSharedRoute(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := r.PathValue("token")
+		if token == "" {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("share token is required")))
+			return
+		}
+		
+		// Check if user is authenticated
+		user := middleware.GetAuthUser(r)
+		if user == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("please log in to join this route")))
+			return
+		}
+		
+		// Get route by token (this validates the token)
+		route, err := storage.GetRouteByShareToken(token)
+		if err != nil {
+			response.WriteJSON(w, http.StatusNotFound, response.GeneralError(err))
+			return
+		}
+		
+		routeObj := route.(types.Route)
+		
+		// Check if user is already the creator
+		if routeObj.CreatorID == user.Email {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(errors.New("you are already the creator of this route")))
+			return
+		}
+		
+		// Add user to shared route
+		err = storage.AddUserToSharedRoute(routeObj.ID, user.Email, user.Email)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		response.WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"message": "Successfully joined the shared route",
+			"route":   route,
+		})
+	}
+}
+
+func GetSharedRoutesForUser(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.GetAuthUser(r)
+		if user == nil {
+			response.WriteJSON(w, http.StatusUnauthorized, response.GeneralError(errors.New("unauthorized")))
+			return
+		}
+		
+		routes, err := storage.GetSharedRoutesForUser(user.Email)
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		
+		response.WriteJSON(w, http.StatusOK, routes)
 	}
 }

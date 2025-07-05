@@ -8,6 +8,7 @@ import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-go
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { DialogContent, DialogDescription, DialogHeader, DialogTitle, Dialog } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import ShareRouteModal from '@/components/ShareRouteModal';
 
 interface Waypoint {
   id: string;
@@ -28,6 +29,12 @@ interface RouteData {
   photos?: any[];
   createdAt?: number;
   updatedAt?: number;
+  sharedWith?: Array<{
+    userId: string;
+    email: string;
+    permission: string;
+    sharedAt: string;
+  }>;
 }
 
 const MiniMap: React.FC<{ route: RouteData }> = ({ route }) => {
@@ -226,6 +233,7 @@ const RouteDetails: React.FC = () => {
   const [currentPhotoPage, setCurrentPhotoPage] = useState<number>(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
+  const [canUploadPhotos, setCanUploadPhotos] = useState(false);
   const [showAddImagesModal, setShowAddImagesModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -233,6 +241,7 @@ const RouteDetails: React.FC = () => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [routeDetailsExpanded, setRouteDetailsExpanded] = useState(false);
   const [coverPhotoIndex, setCoverPhotoIndex] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const user = useAuthGuard();
   const { toast } = useToast();
@@ -258,7 +267,16 @@ const RouteDetails: React.FC = () => {
       // Compare route.creatorId with user.email to determine if the current user is the creator
       const email = localStorage.getItem('email');
       console.log("email from localStorage:", email);
-      setIsCreator(route.creatorId === email);
+      const userIsCreator = route.creatorId === email;
+      setIsCreator(userIsCreator);
+      
+      // Check if user can upload photos (creator or shared user with upload permission)
+      let canUpload = userIsCreator;
+      if (!userIsCreator && route.sharedWith) {
+        const sharedUser = route.sharedWith.find(user => user.email === email);
+        canUpload = sharedUser?.permission === 'upload';
+      }
+      setCanUploadPhotos(canUpload);
     }
   }, [route, user]);
 
@@ -546,17 +564,31 @@ const RouteDetails: React.FC = () => {
         <span className="hidden sm:inline">Back to Routes</span>
       </button>
 
-      {/* Delete button for creators */}
+      {/* Action buttons for creators */}
       {isCreator && (
-        <button
-          className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
-          onClick={() => setShowDeleteConfirm(true)}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          <span className="hidden sm:inline">Delete Route</span>
-        </button>
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          {/* Share button */}
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
+            onClick={() => setShowShareModal(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+            </svg>
+            <span className="hidden sm:inline">Share</span>
+          </button>
+          
+          {/* Delete button */}
+          <button
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span className="hidden sm:inline">Delete Route</span>
+          </button>
+        </div>
       )}
 
       {/* Main content */}
@@ -721,7 +753,7 @@ const RouteDetails: React.FC = () => {
                   </span>
                 )}
               </h2>
-              {isCreator && (
+              {canUploadPhotos && (
                 <button
                   onClick={() => setShowAddImagesModal(true)}
                   className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg shadow transition-all flex items-center gap-2"
@@ -1070,6 +1102,16 @@ const RouteDetails: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Share Route Modal */}
+      {route && (
+        <ShareRouteModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          routeId={route._id}
+          routeName={route.name}
+        />
+      )}
     </div>
   );
 };

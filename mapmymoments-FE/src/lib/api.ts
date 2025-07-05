@@ -383,3 +383,219 @@ export async function unlinkGoogleAccount(): Promise<{ message: string }> {
 
   return response.json();
 }
+
+// Route sharing API types and functions
+export interface ShareRouteRequest {
+  expiryHours?: number;
+}
+
+export interface ShareRouteResponse {
+  shareToken: string;
+  shareUrl: string;
+  expiresAt?: string;
+}
+
+export interface SharedUser {
+  userId: string;
+  email: string;
+  permission: string;
+  sharedAt: string;
+}
+
+/**
+ * Generate a shareable link for a route
+ * 
+ * @param routeId - The ID of the route to share
+ * @param expiryHours - Optional expiry time in hours
+ * @returns Share token and URL
+ */
+export async function shareRoute(routeId: string, expiryHours?: number): Promise<ApiResponse<ShareRouteResponse>> {
+  try {
+    const response = await apiFetch(`/api/routes/${routeId}/share`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        expiryHours: expiryHours || null,
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to share route',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+      message: 'Route shared successfully',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Get sharing information for a route
+ * 
+ * @param routeId - The ID of the route
+ * @returns Sharing information including shared users
+ */
+export async function getRouteShareInfo(routeId: string): Promise<ApiResponse<any>> {
+  try {
+    const response = await apiFetch(`/api/routes/${routeId}/share-info`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get share info',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Revoke sharing for a route
+ * 
+ * @param routeId - The ID of the route
+ * @returns Success message
+ */
+export async function revokeRouteShare(routeId: string): Promise<ApiResponse<{ message: string }>> {
+  try {
+    const response = await apiFetch(`/api/routes/${routeId}/share`, {
+      method: 'DELETE',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to revoke share',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+      message: 'Share revoked successfully',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Get route by share token (public endpoint)
+ * 
+ * @param token - The share token
+ * @returns Route data
+ */
+export async function getSharedRoute(token: string): Promise<ApiResponse<RouteData>> {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/shared-routes/${token}`);
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get shared route',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Join a shared route
+ * 
+ * @param token - The share token
+ * @returns Success message and route data
+ */
+export async function joinSharedRoute(token: string): Promise<ApiResponse<any>> {
+  try {
+    const response = await apiFetch(`/api/shared-routes/${token}/join`, {
+      method: 'POST',
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to join shared route',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+      message: 'Successfully joined shared route',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}
+
+/**
+ * Get routes shared with the current user
+ * 
+ * @returns Array of shared routes
+ */
+export async function getSharedRoutesForUser(): Promise<ApiResponse<RouteData[]>> {
+  try {
+    const response = await apiFetch('/api/my-shared-routes');
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to get shared routes',
+      };
+    }
+
+    return {
+      success: true,
+      data: data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
+import SharedRoutesSection from './SharedRoutesSection';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -200,6 +201,11 @@ const ProfileModal = ({
                   </svg>
                 </button>
               </div>
+            </div>
+
+            {/* Shared Routes Section */}
+            <div className="bg-white rounded-lg shadow-sm">
+              <SharedRoutesSection />
             </div>
 
             {/* Journey Stats Card */}
